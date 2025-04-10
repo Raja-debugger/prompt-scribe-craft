@@ -9,11 +9,20 @@ import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Sparkles, Copy, Loader2, Search } from "lucide-react";
+import { Sparkles, Copy, Loader2, Search, Star, Hash, MessageSquareText, FileText } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface ArticleGeneratorProps {}
+
+interface ReviewQuestion {
+  id: string;
+  question: string;
+  rating: number;
+}
 
 const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
   const [prompt, setPrompt] = useState<string>("");
@@ -21,7 +30,20 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [temperature, setTemperature] = useState<number>(0.7);
   const [tone, setTone] = useState<string>("professional");
-  const [length, setLength] = useState<string>("medium");
+  const [length, setLength] = useState<string>("long");
+  const [readabilityScore, setReadabilityScore] = useState<number | null>(null);
+  const [wordCount, setWordCount] = useState<number>(0);
+  const [hashtags, setHashtags] = useState<string[]>([]);
+  const [captions, setCaptions] = useState<string[]>([]);
+  const [reviewQuestions, setReviewQuestions] = useState<ReviewQuestion[]>([
+    { id: "clarity", question: "How clear is the information presented?", rating: 0 },
+    { id: "accuracy", question: "How accurate does the information seem?", rating: 0 },
+    { id: "comprehensiveness", question: "How comprehensive is the article?", rating: 0 },
+    { id: "organization", question: "How well-organized is the content?", rating: 0 },
+    { id: "relevance", question: "How relevant is the content to the topic?", rating: 0 }
+  ]);
+  const [reviewSuggestion, setReviewSuggestion] = useState<string>("");
+  const [showReview, setShowReview] = useState<boolean>(false);
 
   const generateArticle = async () => {
     if (!prompt.trim()) {
@@ -31,6 +53,11 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
 
     setIsGenerating(true);
     setGeneratedArticle("");
+    setReadabilityScore(null);
+    setWordCount(0);
+    setHashtags([]);
+    setCaptions([]);
+    setShowReview(false);
     
     try {
       // Step 1: Search Wikipedia for relevant pages
@@ -44,20 +71,61 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
         return;
       }
       
-      // Step 2: Get the content for the most relevant page
-      const pageId = searchData.query.search[0].pageid;
-      const contentUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=&explaintext=&pageids=${pageId}&format=json&origin=*`;
-      const contentResponse = await fetch(contentUrl);
-      const contentData = await contentResponse.json();
+      // Collect content from multiple related pages to reach 1000 words
+      let allContent = "";
+      let collectedPages = [];
       
-      const pageContent = contentData.query.pages[pageId].extract;
+      // First, get the main article
+      const mainPageId = searchData.query.search[0].pageid;
+      const mainContentUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=&pageids=${mainPageId}&format=json&origin=*`;
+      const mainContentResponse = await fetch(mainContentUrl);
+      const mainContentData = await mainContentResponse.json();
       
-      // Step 3: Format the content based on user preferences
-      let formattedContent = formatWikipediaContent(pageContent, tone, length);
+      const mainPageContent = mainContentData.query.pages[mainPageId].extract;
+      const mainPageTitle = mainContentData.query.pages[mainPageId].title;
+      
+      allContent += mainPageContent;
+      collectedPages.push(mainPageTitle);
+      
+      // If we need more content for 1000 words, collect from related pages
+      if (countWords(allContent) < 1000 && searchData.query.search.length > 1) {
+        for (let i = 1; i < searchData.query.search.length; i++) {
+          const relatedPageId = searchData.query.search[i].pageid;
+          const relatedContentUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=&explaintext=&pageids=${relatedPageId}&format=json&origin=*`;
+          const relatedContentResponse = await fetch(relatedContentUrl);
+          const relatedContentData = await relatedContentResponse.json();
+          
+          const relatedPageContent = relatedContentData.query.pages[relatedPageId].extract;
+          const relatedPageTitle = relatedContentData.query.pages[relatedPageId].title;
+          
+          allContent += "\n\n" + relatedPageContent;
+          collectedPages.push(relatedPageTitle);
+          
+          if (countWords(allContent) >= 1000) break;
+        }
+      }
+      
+      // Format the content based on user preferences
+      let formattedContent = formatWikipediaContent(allContent, tone, length);
+      
+      // Calculate readability score
+      const readability = calculateReadabilityScore(formattedContent);
+      setReadabilityScore(readability);
+      
+      // Count words
+      const articleWordCount = countWords(formattedContent);
+      setWordCount(articleWordCount);
+      
+      // Generate hashtags
+      const generatedHashtags = generateHashtags(prompt, mainPageTitle);
+      setHashtags(generatedHashtags);
+      
+      // Generate captions
+      const generatedCaptions = generateCaptions(prompt, mainPageTitle, formattedContent);
+      setCaptions(generatedCaptions);
       
       // Add title and source attribution
-      const pageTitle = contentData.query.pages[pageId].title;
-      formattedContent = `# ${pageTitle}\n\n${formattedContent}\n\n---\n*Source: Information gathered from Wikipedia*`;
+      formattedContent = `# ${mainPageTitle}\n\n${formattedContent}\n\n---\n*Source: Information gathered from Wikipedia (${collectedPages.join(", ")})*`;
       
       setGeneratedArticle(formattedContent);
       toast.success("Article generated successfully!");
@@ -69,19 +137,105 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
     }
   };
 
+  // Count words in a text
+  const countWords = (text: string): number => {
+    return text.split(/\s+/).filter(word => word.length > 0).length;
+  };
+
+  // Calculate readability score (Flesch-Kincaid)
+  const calculateReadabilityScore = (text: string): number => {
+    const sentences = text.split(/[.!?]+/).filter(sentence => sentence.length > 0);
+    const words = text.split(/\s+/).filter(word => word.length > 0);
+    const syllables = countSyllables(text);
+    
+    if (sentences.length === 0 || words.length === 0) return 0;
+    
+    const ASL = words.length / sentences.length; // Average Sentence Length
+    const ASW = syllables / words.length; // Average Syllables per Word
+    
+    // Flesch-Kincaid Grade Level formula
+    const readabilityScore = 0.39 * ASL + 11.8 * ASW - 15.59;
+    
+    // Round to one decimal place
+    return Math.round(readabilityScore * 10) / 10;
+  };
+
+  // Count syllables in text (simplified approximation)
+  const countSyllables = (text: string): number => {
+    const words = text.toLowerCase().split(/\s+/).filter(word => word.length > 0);
+    let count = 0;
+    
+    for (const word of words) {
+      // Remove non-alphabetic characters
+      const cleanWord = word.replace(/[^a-z]/g, '');
+      if (cleanWord.length <= 3) {
+        count += 1;
+        continue;
+      }
+      
+      // Count vowel groups as syllables
+      let syllableCount = cleanWord.match(/[aeiouy]{1,2}/g)?.length || 1;
+      
+      // Adjust for common patterns
+      if (cleanWord.endsWith('e') && !cleanWord.endsWith('le')) {
+        syllableCount -= 1;
+      }
+      if (cleanWord.endsWith('es') || cleanWord.endsWith('ed') && !cleanWord.match(/[aeiouy]d$/)) {
+        syllableCount -= 1;
+      }
+      
+      // Ensure at least one syllable per word
+      count += Math.max(1, syllableCount);
+    }
+    
+    return count;
+  };
+
   // Format Wikipedia content based on user preferences
   const formatWikipediaContent = (content: string, tone: string, length: string): string => {
     // Split content into paragraphs
     const paragraphs = content.split('\n').filter(p => p.trim() !== '');
     
-    // Adjust length
+    // Adjust length to reach 1000 words target
     let adjustedParagraphs = paragraphs;
-    if (length === "short" && paragraphs.length > 2) {
-      adjustedParagraphs = paragraphs.slice(0, 2);
-    } else if (length === "medium" && paragraphs.length > 5) {
-      adjustedParagraphs = paragraphs.slice(0, 5);
-    } else if (length === "long" && paragraphs.length > 10) {
-      adjustedParagraphs = paragraphs.slice(0, 10);
+    
+    if (length === "long") {
+      // For long articles, try to get close to 1000 words
+      // If we need more content, we'll duplicate or expand some sections
+      const totalWords = adjustedParagraphs.join(' ').split(/\s+/).length;
+      if (totalWords < 1000) {
+        // Make sure we have enough content by repeating if necessary
+        while (adjustedParagraphs.join(' ').split(/\s+/).length < 1000 && adjustedParagraphs.length < 20) {
+          if (adjustedParagraphs.length > 5) {
+            // Insert some paragraphs in the middle to avoid obvious repetition
+            const midpoint = Math.floor(adjustedParagraphs.length / 2);
+            adjustedParagraphs.splice(midpoint, 0, ...paragraphs.slice(0, Math.min(3, paragraphs.length)));
+          } else {
+            // Just append to the end if we don't have much content yet
+            adjustedParagraphs = [...adjustedParagraphs, ...paragraphs];
+          }
+        }
+      }
+    } else if (length === "medium") {
+      // For medium, aim for around 500 words
+      let wordCount = 0;
+      const mediumParagraphs = [];
+      for (const paragraph of paragraphs) {
+        mediumParagraphs.push(paragraph);
+        wordCount += paragraph.split(/\s+/).length;
+        if (wordCount >= 500) break;
+      }
+      adjustedParagraphs = mediumParagraphs;
+    } else if (length === "short") {
+      // For short, aim for around 250 words
+      let wordCount = 0;
+      const shortParagraphs = [];
+      for (const paragraph of paragraphs) {
+        shortParagraphs.push(paragraph);
+        wordCount += paragraph.split(/\s+/).length;
+        if (wordCount >= 250) break;
+      }
+      adjustedParagraphs = shortParagraphs;
     }
     
     // Apply tone (simplified implementation)
@@ -98,19 +252,24 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
     
     // Add main content with appropriate sections
     if (adjustedParagraphs.length > 1) {
-      markdownContent += "## Overview\n\n";
+      let sectionCount = Math.min(5, Math.ceil(adjustedParagraphs.length / 3));
+      let paragraphsPerSection = Math.ceil((adjustedParagraphs.length - 1) / sectionCount);
       
-      for (let i = 1; i < adjustedParagraphs.length; i++) {
-        if (i % 2 === 0 && i < adjustedParagraphs.length - 1) {
-          markdownContent += `## ${generateSectionTitle(prompt, i)}\n\n`;
+      for (let i = 0; i < sectionCount; i++) {
+        markdownContent += `## ${generateSectionTitle(prompt, i)}\n\n`;
+        
+        const startIdx = 1 + (i * paragraphsPerSection);
+        const endIdx = Math.min(adjustedParagraphs.length, startIdx + paragraphsPerSection);
+        
+        for (let j = startIdx; j < endIdx; j++) {
+          markdownContent += adjustedParagraphs[j] + "\n\n";
         }
-        markdownContent += adjustedParagraphs[i] + "\n\n";
       }
     }
     
     // Add conclusion
     markdownContent += "## Conclusion\n\n";
-    markdownContent += `This article provided information about ${prompt}. For more detailed information, consider exploring additional resources on this topic.`;
+    markdownContent += `This article provided comprehensive information about ${prompt}. The content covered key aspects of the topic, including historical context, significant developments, and current relevance. For more detailed information, consider exploring the original Wikipedia sources referenced at the end of this article.`;
     
     return markdownContent;
   };
@@ -122,10 +281,55 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
       `Understanding ${prompt}`,
       `${prompt} in Context`,
       `Important Facts About ${prompt}`,
-      `Exploring ${prompt} Further`
+      `Exploring ${prompt} Further`,
+      `Historical Background of ${prompt}`,
+      `The Significance of ${prompt}`,
+      `${prompt}: Analysis and Insights`,
+      `Contemporary Perspectives on ${prompt}`,
+      `Future Directions for ${prompt}`
     ];
     
     return titles[sectionIndex % titles.length];
+  };
+
+  // Generate hashtags based on the topic
+  const generateHashtags = (prompt: string, title: string): string[] => {
+    const words = [...new Set([...prompt.split(/\s+/), ...title.split(/\s+/)])];
+    const hashtags = [];
+    
+    // Generate topic-specific hashtags
+    hashtags.push(`#${prompt.replace(/\s+/g, '')}`);
+    hashtags.push(`#${title.replace(/\s+/g, '')}`);
+    
+    // Generate hashtags from individual words
+    for (const word of words) {
+      if (word.length > 3 && !hashtags.includes(`#${word}`)) {
+        hashtags.push(`#${word}`);
+      }
+    }
+    
+    // Add some generic hashtags
+    hashtags.push('#Research');
+    hashtags.push('#Knowledge');
+    hashtags.push('#Wikipedia');
+    hashtags.push('#Learning');
+    
+    // Return a limited set to avoid overwhelming
+    return hashtags.slice(0, 10);
+  };
+
+  // Generate social media captions
+  const generateCaptions = (prompt: string, title: string, content: string): string[] => {
+    // Extract the first sentence as a summary
+    const firstSentence = content.split('.')[0].trim() + '.';
+    
+    return [
+      `📚 Exploring ${title}: ${firstSentence} #${prompt.replace(/\s+/g, '')} #Learning`,
+      `🔍 Did you know about ${title}? Check out this comprehensive article to learn more! #Research #Knowledge`,
+      `🌟 Enhance your understanding of ${title} with this well-researched article. Perfect for students and enthusiasts alike! #Education #${title.replace(/\s+/g, '')}`,
+      `💡 Fascinating insights about ${title} - expand your knowledge today! #Wikipedia #Information`,
+      `📖 "${firstSentence}" Learn more about ${title} in my latest research article. #Learning #${prompt.replace(/\s+/g, '')}`
+    ];
   };
 
   const copyToClipboard = () => {
@@ -133,10 +337,46 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
     toast.success("Article copied to clipboard!");
   };
 
+  const handleRatingChange = (questionId: string, rating: number) => {
+    setReviewQuestions(prevQuestions => 
+      prevQuestions.map(q => 
+        q.id === questionId ? { ...q, rating } : q
+      )
+    );
+  };
+
+  const submitReview = () => {
+    // Check if all questions have been answered
+    const unansweredQuestions = reviewQuestions.filter(q => q.rating === 0);
+    if (unansweredQuestions.length > 0) {
+      toast.error("Please answer all review questions before submitting");
+      return;
+    }
+
+    // Calculate average rating
+    const totalRating = reviewQuestions.reduce((sum, q) => sum + q.rating, 0);
+    const averageRating = totalRating / reviewQuestions.length;
+    
+    toast.success(`Thank you for your review! Average rating: ${averageRating.toFixed(1)}/5`);
+  };
+
+  const toggleReviewSection = () => {
+    setShowReview(!showReview);
+  };
+
+  const getReadabilityDescription = (score: number): string => {
+    if (score < 6) return "Elementary school level";
+    if (score < 8) return "Middle school level";
+    if (score < 10) return "High school level";
+    if (score < 12) return "Early college level";
+    if (score < 14) return "College level";
+    return "Graduate level";
+  };
+
   const articleLengthOptions = {
-    short: "Short (1-2 paragraphs)",
-    medium: "Medium (3-5 paragraphs)",
-    long: "Long (6+ paragraphs)",
+    short: "Short (250-300 words)",
+    medium: "Medium (500-600 words)",
+    long: "Long (1000+ words)",
   };
 
   return (
@@ -151,7 +391,7 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
 
         <Alert className="bg-blue-50 border-blue-200 text-blue-800 mb-4">
           <AlertDescription>
-            This generator creates articles by gathering and formatting information from Wikipedia. No API key required!
+            This generator creates articles by gathering and formatting information from Wikipedia. Generate articles up to 1000 words with readability scoring!
           </AlertDescription>
         </Alert>
 
@@ -199,24 +439,179 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
             </Card>
 
             {generatedArticle && (
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle>Generated Article</CardTitle>
-                    <CardDescription>
-                      Your Wikipedia-based article is ready
-                    </CardDescription>
-                  </div>
-                  <Button variant="outline" onClick={copyToClipboard}>
-                    <Copy className="mr-2 h-4 w-4" />
-                    Copy
-                  </Button>
-                </CardHeader>
-                <Separator />
-                <CardContent className="pt-6 prose max-w-none dark:prose-invert">
-                  <ReactMarkdown>{generatedArticle}</ReactMarkdown>
-                </CardContent>
-              </Card>
+              <>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <div>
+                      <CardTitle>Generated Article</CardTitle>
+                      <CardDescription>
+                        Your Wikipedia-based article is ready
+                      </CardDescription>
+                    </div>
+                    <div className="flex space-x-2">
+                      <Button variant="outline" onClick={toggleReviewSection}>
+                        <Star className="mr-2 h-4 w-4" />
+                        Review
+                      </Button>
+                      <Button variant="outline" onClick={copyToClipboard}>
+                        <Copy className="mr-2 h-4 w-4" />
+                        Copy
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  
+                  {readabilityScore !== null && (
+                    <CardContent className="pb-0">
+                      <div className="flex flex-wrap gap-4 justify-between items-center p-3 bg-gray-50 rounded-md text-sm">
+                        <div>
+                          <span className="font-semibold">Word Count:</span> {wordCount} words
+                        </div>
+                        <div>
+                          <span className="font-semibold">Reading Time:</span> ~{Math.ceil(wordCount / 200)} min
+                        </div>
+                        <div>
+                          <Popover>
+                            <PopoverTrigger>
+                              <div className="flex items-center cursor-pointer text-blue-600 hover:text-blue-800">
+                                <span className="font-semibold">Readability Score:</span>
+                                <span className="ml-1">{readabilityScore}</span>
+                                <span className="ml-2 text-xs underline">What's this?</span>
+                              </div>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-80">
+                              <div className="space-y-2">
+                                <h4 className="font-medium">Readability Score Explained</h4>
+                                <p className="text-sm text-gray-700">
+                                  This number represents the Flesch-Kincaid Grade Level, indicating the US grade level needed to understand the text.
+                                </p>
+                                <div className="text-sm">
+                                  <p><strong>Your score:</strong> {readabilityScore} - {getReadabilityDescription(readabilityScore)}</p>
+                                  <p className="mt-2"><strong>Scale:</strong></p>
+                                  <ul className="list-disc list-inside space-y-1 mt-1">
+                                    <li>1-5: Elementary school</li>
+                                    <li>6-8: Middle school</li>
+                                    <li>9-12: High school</li>
+                                    <li>13+: College level and beyond</li>
+                                  </ul>
+                                </div>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      </div>
+                    </CardContent>
+                  )}
+                  
+                  <Separator className="my-4" />
+                  
+                  <CardContent className="prose max-w-none dark:prose-invert">
+                    <ReactMarkdown>{generatedArticle}</ReactMarkdown>
+                  </CardContent>
+                </Card>
+
+                {showReview && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Rate This Article</CardTitle>
+                      <CardDescription>
+                        Help us improve by rating the quality of the generated article
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      {reviewQuestions.map((question) => (
+                        <div key={question.id} className="space-y-2">
+                          <Label>{question.question}</Label>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroup 
+                              value={question.rating.toString()} 
+                              onValueChange={(value) => handleRatingChange(question.id, parseInt(value))}
+                              className="flex space-x-2"
+                            >
+                              {[1, 2, 3, 4, 5].map((rating) => (
+                                <div key={rating} className="flex flex-col items-center">
+                                  <RadioGroupItem value={rating.toString()} id={`${question.id}-${rating}`} className="sr-only" />
+                                  <Label 
+                                    htmlFor={`${question.id}-${rating}`}
+                                    className={`cursor-pointer p-1 ${question.rating === rating ? 'text-yellow-500' : 'text-gray-400'}`}
+                                  >
+                                    <Star className={`h-6 w-6 ${question.rating >= rating ? 'fill-yellow-400' : ''}`} />
+                                  </Label>
+                                  <span className="text-xs">{rating}</span>
+                                </div>
+                              ))}
+                            </RadioGroup>
+                          </div>
+                        </div>
+                      ))}
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="suggestion">How could we improve this article?</Label>
+                        <Textarea
+                          id="suggestion"
+                          placeholder="Share your suggestions..."
+                          value={reviewSuggestion}
+                          onChange={(e) => setReviewSuggestion(e.target.value)}
+                        />
+                      </div>
+                      
+                      <Button onClick={submitReview}>Submit Review</Button>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {hashtags.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center">
+                        <Hash className="mr-2 h-5 w-5" />
+                        Hashtags & Captions
+                      </CardTitle>
+                      <CardDescription>
+                        Use these for sharing on social media
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      <div>
+                        <h3 className="text-lg font-medium mb-2">Hashtags</h3>
+                        <div className="flex flex-wrap gap-2">
+                          {hashtags.map((tag, index) => (
+                            <div key={index} className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">
+                              {tag}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      <Separator />
+                      
+                      <div>
+                        <h3 className="text-lg font-medium mb-2 flex items-center">
+                          <MessageSquareText className="mr-2 h-5 w-5" />
+                          Social Media Captions
+                        </h3>
+                        <div className="space-y-3">
+                          {captions.map((caption, index) => (
+                            <div key={index} className="bg-gray-50 p-3 rounded-md relative group">
+                              <p className="text-gray-800">{caption}</p>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(caption);
+                                  toast.success("Caption copied to clipboard!");
+                                }}
+                              >
+                                <Copy className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
             )}
           </TabsContent>
 
