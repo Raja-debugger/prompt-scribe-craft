@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,12 +8,14 @@ import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Sparkles, Copy, Loader2, Search, Star, Hash, MessageSquareText, FileText } from "lucide-react";
+import { Sparkles, Copy, Loader2, Search, Star, Hash, MessageSquareText, FileText, Image as ImageIcon, Folder } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 
 interface ArticleGeneratorProps {}
 
@@ -24,8 +25,22 @@ interface ReviewQuestion {
   rating: number;
 }
 
+interface SEOMetadata {
+  title: string;
+  description: string;
+  keywords: string[];
+  wordCount: number;
+  readabilityScore: number | null;
+  keywordDensity: {
+    keyword: string;
+    count: number;
+    density: number;
+  }[];
+}
+
 const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
   const [prompt, setPrompt] = useState<string>("");
+  const [category, setCategory] = useState<string>("");
   const [generatedArticle, setGeneratedArticle] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [temperature, setTemperature] = useState<number>(0.7);
@@ -35,6 +50,11 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
   const [wordCount, setWordCount] = useState<number>(0);
   const [hashtags, setHashtags] = useState<string[]>([]);
   const [captions, setCaptions] = useState<string[]>([]);
+  const [seoMetadata, setSeoMetadata] = useState<SEOMetadata | null>(null);
+  const [selectedTab, setSelectedTab] = useState<string>("generate");
+  const [activeImageTab, setActiveImageTab] = useState<string>("suggested");
+  const [suggestedImages, setSuggestedImages] = useState<string[]>([]);
+  const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [reviewQuestions, setReviewQuestions] = useState<ReviewQuestion[]>([
     { id: "clarity", question: "How clear is the information presented?", rating: 0 },
     { id: "accuracy", question: "How accurate does the information seem?", rating: 0 },
@@ -44,6 +64,15 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
   ]);
   const [reviewSuggestion, setReviewSuggestion] = useState<string>("");
   const [showReview, setShowReview] = useState<boolean>(false);
+
+  // Sample placeholder images for demonstration
+  const placeholderImages = [
+    "https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?w=600&auto=format&fit=crop&q=60",
+    "https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=600&auto=format&fit=crop&q=60",
+    "https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?w=600&auto=format&fit=crop&q=60",
+    "https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=600&auto=format&fit=crop&q=60",
+    "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=600&auto=format&fit=crop&q=60"
+  ];
 
   const generateArticle = async () => {
     if (!prompt.trim()) {
@@ -58,6 +87,9 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
     setHashtags([]);
     setCaptions([]);
     setShowReview(false);
+    setSuggestedImages([]);
+    setSelectedImages([]);
+    setSeoMetadata(null);
     
     try {
       // Step 1: Search Wikipedia for relevant pages
@@ -123,6 +155,13 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
       // Generate captions
       const generatedCaptions = generateCaptions(prompt, mainPageTitle, formattedContent);
       setCaptions(generatedCaptions);
+
+      // Generate SEO metadata
+      const seoData = generateSEOMetadata(prompt, formattedContent, mainPageTitle);
+      setSeoMetadata(seoData);
+
+      // Generate suggested images
+      setSuggestedImages(placeholderImages.slice(0, 3));
       
       // Add title and source attribution
       formattedContent = `# ${mainPageTitle}\n\n${formattedContent}\n\n---\n*Source: Information gathered from Wikipedia (${collectedPages.join(", ")})*`;
@@ -332,6 +371,68 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
     ];
   };
 
+  // Generate SEO metadata
+  const generateSEOMetadata = (prompt: string, content: string, title: string): SEOMetadata => {
+    // Extract the first paragraph for a description
+    const paragraphs = content.split('\n\n');
+    let description = '';
+    
+    for (const paragraph of paragraphs) {
+      if (paragraph.trim() && !paragraph.startsWith('#')) {
+        description = paragraph.slice(0, 160) + (paragraph.length > 160 ? '...' : '');
+        break;
+      }
+    }
+    
+    // Generate keywords from the content
+    const words = content.toLowerCase().split(/\s+/);
+    const wordFrequency: {[key: string]: number} = {};
+    
+    // Skip common words
+    const commonWords = new Set(['the', 'and', 'of', 'to', 'a', 'in', 'for', 'is', 'on', 'that', 'by', 'this', 'with', 'i', 'you', 'it', 'not', 'or', 'be', 'are', 'from', 'at', 'as', 'your']);
+    
+    for (const word of words) {
+      const cleanWord = word.replace(/[^a-z]/g, '');
+      if (cleanWord.length < 3 || commonWords.has(cleanWord)) continue;
+      
+      wordFrequency[cleanWord] = (wordFrequency[cleanWord] || 0) + 1;
+    }
+    
+    // Sort by frequency
+    const sortedWords = Object.entries(wordFrequency).sort((a, b) => b[1] - a[1]);
+    
+    // Extract top keywords
+    const keywords = sortedWords.slice(0, 10).map(entry => entry[0]);
+    
+    // Calculate keyword density for top 5 keywords
+    const totalWords = words.length;
+    const keywordDensity = sortedWords.slice(0, 5).map(([keyword, count]) => ({
+      keyword,
+      count,
+      density: Math.round((count / totalWords) * 1000) / 10, // Percentage with one decimal
+    }));
+    
+    return {
+      title,
+      description,
+      keywords,
+      wordCount: totalWords,
+      readabilityScore: calculateReadabilityScore(content),
+      keywordDensity,
+    };
+  };
+
+  // Function to optimize image alt text based on the article content
+  const generateImageAltText = (image: string, content: string): string => {
+    const filenameParts = image.split('/').pop()?.split('?')[0].split('-') || [];
+    const keywords = filenameParts
+      .filter(word => word.length > 3)
+      .map(word => word.replace(/[0-9]/g, ''));
+    
+    // Combine with the main topic
+    return `${prompt} - ${keywords.join(' ')}`;
+  };
+
   const copyToClipboard = () => {
     navigator.clipboard.writeText(generatedArticle);
     toast.success("Article copied to clipboard!");
@@ -373,6 +474,22 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
     return "Graduate level";
   };
 
+  const getReadabilityColor = (score: number): string => {
+    if (score < 8) return "text-green-600"; // Easy to read
+    if (score < 12) return "text-amber-600"; // Moderate
+    return "text-red-600"; // Difficult
+  };
+
+  const toggleImageSelection = (imageUrl: string) => {
+    setSelectedImages(prev => {
+      if (prev.includes(imageUrl)) {
+        return prev.filter(img => img !== imageUrl);
+      } else {
+        return [...prev, imageUrl];
+      }
+    });
+  };
+
   const articleLengthOptions = {
     short: "Short (250-300 words)",
     medium: "Medium (500-600 words)",
@@ -391,14 +508,15 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
 
         <Alert className="bg-blue-50 border-blue-200 text-blue-800 mb-4">
           <AlertDescription>
-            This generator creates articles by gathering and formatting information from Wikipedia. Generate articles up to 1000 words with readability scoring!
+            This generator creates articles by gathering and formatting information from Wikipedia. Generate articles up to 1000 words with readability scoring and SEO optimization!
           </AlertDescription>
         </Alert>
 
-        <Tabs defaultValue="generate" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-6">
+        <Tabs defaultValue="generate" className="w-full" value={selectedTab} onValueChange={setSelectedTab}>
+          <TabsList className="grid w-full grid-cols-3 mb-6">
             <TabsTrigger value="generate">Generate Article</TabsTrigger>
             <TabsTrigger value="settings">Format Settings</TabsTrigger>
+            <TabsTrigger value="seo" disabled={!generatedArticle}>SEO Tools</TabsTrigger>
           </TabsList>
 
           <TabsContent value="generate" className="space-y-6">
@@ -409,13 +527,34 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
                   Enter a topic, person, event, or concept to generate an article from Wikipedia
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <Textarea
-                  placeholder="Enter your topic here... (e.g., 'Quantum Physics', 'Leonardo da Vinci', 'Climate Change')"
-                  className="h-40 resize-none"
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                />
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="topic">Topic</Label>
+                  <Textarea
+                    id="topic"
+                    placeholder="Enter your topic here... (e.g., 'Quantum Physics', 'Leonardo da Vinci', 'Climate Change')"
+                    className="h-40 resize-none"
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="category">Category (Optional)</Label>
+                  <Select value={category} onValueChange={setCategory}>
+                    <SelectTrigger id="category">
+                      <SelectValue placeholder="Select a category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="science">Science</SelectItem>
+                      <SelectItem value="history">History</SelectItem>
+                      <SelectItem value="technology">Technology</SelectItem>
+                      <SelectItem value="art">Art & Culture</SelectItem>
+                      <SelectItem value="business">Business</SelectItem>
+                      <SelectItem value="health">Health & Medicine</SelectItem>
+                      <SelectItem value="general">General Knowledge</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </CardContent>
               <CardFooter className="flex justify-end">
                 <Button 
@@ -457,6 +596,13 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
                         <Copy className="mr-2 h-4 w-4" />
                         Copy
                       </Button>
+                      <Button 
+                        variant="outline" 
+                        onClick={() => setSelectedTab("seo")}
+                      >
+                        <Sparkles className="mr-2 h-4 w-4" />
+                        SEO
+                      </Button>
                     </div>
                   </CardHeader>
                   
@@ -474,7 +620,7 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
                             <PopoverTrigger>
                               <div className="flex items-center cursor-pointer text-blue-600 hover:text-blue-800">
                                 <span className="font-semibold">Readability Score:</span>
-                                <span className="ml-1">{readabilityScore}</span>
+                                <span className={`ml-1 ${getReadabilityColor(readabilityScore)}`}>{readabilityScore}</span>
                                 <span className="ml-2 text-xs underline">What's this?</span>
                               </div>
                             </PopoverTrigger>
@@ -606,74 +752,3 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
                               </Button>
                             </div>
                           ))}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-              </>
-            )}
-          </TabsContent>
-
-          <TabsContent value="settings" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Content Settings</CardTitle>
-                <CardDescription>
-                  Customize how your article will be formatted
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-3">
-                  <Label>Content Focus</Label>
-                  <Slider
-                    defaultValue={[temperature]}
-                    max={1}
-                    step={0.1}
-                    onValueChange={(value) => setTemperature(value[0])}
-                  />
-                  <div className="flex justify-between text-xs text-gray-500">
-                    <span>More General</span>
-                    <span>More Specific</span>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <Label htmlFor="tone">Tone</Label>
-                  <Select value={tone} onValueChange={setTone}>
-                    <SelectTrigger id="tone">
-                      <SelectValue placeholder="Select tone" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="professional">Professional</SelectItem>
-                      <SelectItem value="conversational">Conversational</SelectItem>
-                      <SelectItem value="informative">Informative</SelectItem>
-                      <SelectItem value="educational">Educational</SelectItem>
-                      <SelectItem value="simplified">Simplified</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-3">
-                  <Label htmlFor="length">Article Length</Label>
-                  <Select value={length} onValueChange={setLength}>
-                    <SelectTrigger id="length">
-                      <SelectValue placeholder="Select length" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="short">{articleLengthOptions.short}</SelectItem>
-                      <SelectItem value="medium">{articleLengthOptions.medium}</SelectItem>
-                      <SelectItem value="long">{articleLengthOptions.long}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
-    </div>
-  );
-};
-
-export default ArticleGenerator;
