@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -752,3 +753,280 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
                               </Button>
                             </div>
                           ))}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
+            )}
+          </TabsContent>
+
+          <TabsContent value="settings" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Formatting Options</CardTitle>
+                <CardDescription>
+                  Customize how your generated article will look and sound
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-3">
+                  <Label>Article Length</Label>
+                  <RadioGroup 
+                    value={length}
+                    onValueChange={setLength}
+                    className="flex flex-col space-y-1"
+                  >
+                    {Object.entries(articleLengthOptions).map(([value, label]) => (
+                      <div className="flex items-center space-x-2" key={value}>
+                        <RadioGroupItem value={value} id={`length-${value}`} />
+                        <Label htmlFor={`length-${value}`}>{label}</Label>
+                      </div>
+                    ))}
+                  </RadioGroup>
+                </div>
+
+                <div className="space-y-3">
+                  <Label>Writing Tone</Label>
+                  <RadioGroup 
+                    value={tone} 
+                    onValueChange={setTone}
+                    className="flex flex-col space-y-1"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="professional" id="tone-professional" />
+                      <Label htmlFor="tone-professional">Professional</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="casual" id="tone-casual" />
+                      <Label htmlFor="tone-casual">Casual</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="simple" id="tone-simple" />
+                      <Label htmlFor="tone-simple">Simple</Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <Label htmlFor="creativity">Creativity Level (Temperature)</Label>
+                    <span className="text-sm text-gray-500">{temperature.toFixed(1)}</span>
+                  </div>
+                  <Slider
+                    id="creativity"
+                    value={[temperature]}
+                    min={0}
+                    max={1}
+                    step={0.1}
+                    onValueChange={(values) => setTemperature(values[0])}
+                  />
+                  <div className="flex justify-between text-xs text-gray-500">
+                    <span>More Factual</span>
+                    <span>More Creative</span>
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter>
+                <p className="text-sm text-gray-500 italic">
+                  These settings will apply to the next article you generate
+                </p>
+              </CardFooter>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="seo" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>SEO Analysis</CardTitle>
+                <CardDescription>
+                  Search engine optimization metrics and suggestions for your article
+                </CardDescription>
+              </CardHeader>
+              {seoMetadata ? (
+                <CardContent className="space-y-6">
+                  <div className="space-y-3">
+                    <h3 className="text-lg font-medium">Meta Title</h3>
+                    <div className="p-3 bg-gray-50 rounded-md">
+                      <p className="text-blue-600 font-medium">{seoMetadata.title}</p>
+                      <p className="text-green-700 text-sm mt-1">{seoMetadata.description}</p>
+                    </div>
+                    <p className="text-sm text-gray-500">
+                      This is how your article might appear in search engine results.
+                    </p>
+                  </div>
+                  
+                  <Separator />
+                  
+                  <div className="space-y-3">
+                    <h3 className="text-lg font-medium">Keyword Analysis</h3>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Keyword</TableHead>
+                          <TableHead className="text-right">Count</TableHead>
+                          <TableHead className="text-right">Density</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {seoMetadata.keywordDensity.map((keyword) => (
+                          <TableRow key={keyword.keyword}>
+                            <TableCell className="font-medium">{keyword.keyword}</TableCell>
+                            <TableCell className="text-right">{keyword.count}</TableCell>
+                            <TableCell className="text-right">{keyword.density}%</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  
+                  <Separator />
+                  
+                  <div className="space-y-3">
+                    <h3 className="text-lg font-medium">Recommended Keywords</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {seoMetadata.keywords.map((keyword, index) => (
+                        <Badge key={index} variant="outline" className="bg-gray-50">
+                          {keyword}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <Separator />
+                  
+                  <div className="space-y-3">
+                    <h3 className="text-lg font-medium">Content Stats</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="p-4 bg-gray-50 rounded-md">
+                        <p className="text-sm text-gray-600">Word Count</p>
+                        <p className="text-2xl font-bold">{seoMetadata.wordCount}</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {seoMetadata.wordCount < 300 ? "Consider adding more content" : 
+                           seoMetadata.wordCount >= 1000 ? "Excellent length" : "Good length"}
+                        </p>
+                      </div>
+                      <div className="p-4 bg-gray-50 rounded-md">
+                        <p className="text-sm text-gray-600">Readability</p>
+                        <p className="text-2xl font-bold">{seoMetadata.readabilityScore}</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {getReadabilityDescription(seoMetadata.readabilityScore || 0)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              ) : (
+                <CardContent>
+                  <div className="p-8 text-center">
+                    <p className="text-gray-500">Generate an article first to view SEO analysis</p>
+                  </div>
+                </CardContent>
+              )}
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <ImageIcon className="mr-2 h-5 w-5" />
+                  Image Suggestions
+                </CardTitle>
+                <CardDescription>
+                  Select images to complement your article
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Tabs value={activeImageTab} onValueChange={setActiveImageTab} className="w-full">
+                  <TabsList className="grid w-full grid-cols-2 mb-4">
+                    <TabsTrigger value="suggested">Suggested Images</TabsTrigger>
+                    <TabsTrigger value="selected">Selected ({selectedImages.length})</TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="suggested" className="space-y-4">
+                    {suggestedImages.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {suggestedImages.map((image, index) => (
+                          <div 
+                            key={index} 
+                            className={`rounded-md overflow-hidden border-2 cursor-pointer relative ${
+                              selectedImages.includes(image) ? 'border-blue-500' : 'border-transparent'
+                            }`}
+                            onClick={() => toggleImageSelection(image)}
+                          >
+                            <img 
+                              src={image} 
+                              alt={generateImageAltText(image, generatedArticle)} 
+                              className="w-full h-48 object-cover"
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 hover:bg-opacity-20 transition-all">
+                              {selectedImages.includes(image) && (
+                                <div className="bg-blue-500 text-white p-2 rounded-full">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                  </svg>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center p-8">
+                        <p className="text-gray-500">No images suggested yet. Generate an article first.</p>
+                      </div>
+                    )}
+                  </TabsContent>
+                  
+                  <TabsContent value="selected">
+                    {selectedImages.length > 0 ? (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {selectedImages.map((image, index) => (
+                            <div key={index} className="rounded-md overflow-hidden border relative group">
+                              <img 
+                                src={image} 
+                                alt={generateImageAltText(image, generatedArticle)} 
+                                className="w-full h-48 object-cover"
+                              />
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleImageSelection(image);
+                                }}
+                              >
+                                Remove
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                        
+                        <div className="bg-blue-50 p-4 rounded-md">
+                          <h4 className="font-medium text-blue-800 mb-2">Usage Tips</h4>
+                          <ul className="list-disc list-inside text-sm text-blue-700 space-y-1">
+                            <li>For best results, place images between main sections of your article</li>
+                            <li>Always add proper alt text to improve accessibility and SEO</li>
+                            <li>Ensure you have the right to use these images for your specific purpose</li>
+                          </ul>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center p-8">
+                        <p className="text-gray-500">No images selected yet. Select from the suggested images tab.</p>
+                      </div>
+                    )}
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  );
+};
+
+export default ArticleGenerator;
