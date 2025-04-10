@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -66,7 +65,6 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
   const [reviewSuggestion, setReviewSuggestion] = useState<string>("");
   const [showReview, setShowReview] = useState<boolean>(false);
 
-  // Sample placeholder images for demonstration
   const placeholderImages = [
     "https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?w=600&auto=format&fit=crop&q=60",
     "https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=600&auto=format&fit=crop&q=60",
@@ -93,7 +91,6 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
     setSeoMetadata(null);
     
     try {
-      // Step 1: Search Wikipedia for relevant pages
       const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(prompt)}&format=json&origin=*&srlimit=3`;
       const searchResponse = await fetch(searchUrl);
       const searchData = await searchResponse.json();
@@ -104,11 +101,9 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
         return;
       }
       
-      // Collect content from multiple related pages to reach 1000 words
       let allContent = "";
       let collectedPages = [];
       
-      // First, get the main article
       const mainPageId = searchData.query.search[0].pageid;
       const mainContentUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=&pageids=${mainPageId}&format=json&origin=*`;
       const mainContentResponse = await fetch(mainContentUrl);
@@ -120,8 +115,7 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
       allContent += mainPageContent;
       collectedPages.push(mainPageTitle);
       
-      // If we need more content for 1000 words, collect from related pages
-      if (countWords(allContent) < 1000 && searchData.query.search.length > 1) {
+      if (countWords(allContent) < 800 && searchData.query.search.length > 1) {
         for (let i = 1; i < searchData.query.search.length; i++) {
           const relatedPageId = searchData.query.search[i].pageid;
           const relatedContentUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=&explaintext=&pageids=${relatedPageId}&format=json&origin=*`;
@@ -134,38 +128,30 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
           allContent += "\n\n" + relatedPageContent;
           collectedPages.push(relatedPageTitle);
           
-          if (countWords(allContent) >= 1000) break;
+          if (countWords(allContent) >= 800) break;
         }
       }
       
-      // Format the content based on user preferences
-      let formattedContent = formatWikipediaContent(allContent, tone, length);
+      let formattedContent = formatWikipediaContent(allContent, tone, "long", 1200);
       
-      // Calculate readability score
       const readability = calculateReadabilityScore(formattedContent);
       setReadabilityScore(readability);
       
-      // Count words
       const articleWordCount = countWords(formattedContent);
       setWordCount(articleWordCount);
       
-      // Generate hashtags
       const generatedHashtags = generateHashtags(prompt, mainPageTitle);
       setHashtags(generatedHashtags);
       
-      // Generate captions
       const generatedCaptions = generateCaptions(prompt, mainPageTitle, formattedContent);
       setCaptions(generatedCaptions);
 
-      // Generate SEO metadata
       const seoData = generateSEOMetadata(prompt, formattedContent, mainPageTitle);
       setSeoMetadata(seoData);
 
-      // Generate suggested images
       setSuggestedImages(placeholderImages.slice(0, 3));
       
-      // Add title and source attribution
-      formattedContent = `# ${mainPageTitle}\n\n${formattedContent}\n\n---\n*Source: Information gathered from Wikipedia (${collectedPages.join(", ")})*`;
+      formattedContent = `# **${mainPageTitle}**\n\n${formattedContent}\n\n---\n*Source: Information gathered from Wikipedia (${collectedPages.join(", ")})*`;
       
       setGeneratedArticle(formattedContent);
       toast.success("Article generated successfully!");
@@ -177,12 +163,10 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
     }
   };
 
-  // Count words in a text
   const countWords = (text: string): number => {
     return text.split(/\s+/).filter(word => word.length > 0).length;
   };
 
-  // Calculate readability score (Flesch-Kincaid)
   const calculateReadabilityScore = (text: string): number => {
     const sentences = text.split(/[.!?]+/).filter(sentence => sentence.length > 0);
     const words = text.split(/\s+/).filter(word => word.length > 0);
@@ -193,30 +177,24 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
     const ASL = words.length / sentences.length; // Average Sentence Length
     const ASW = syllables / words.length; // Average Syllables per Word
     
-    // Flesch-Kincaid Grade Level formula
     const readabilityScore = 0.39 * ASL + 11.8 * ASW - 15.59;
     
-    // Round to one decimal place
     return Math.round(readabilityScore * 10) / 10;
   };
 
-  // Count syllables in text (simplified approximation)
   const countSyllables = (text: string): number => {
     const words = text.toLowerCase().split(/\s+/).filter(word => word.length > 0);
     let count = 0;
     
     for (const word of words) {
-      // Remove non-alphabetic characters
       const cleanWord = word.replace(/[^a-z]/g, '');
-      if (cleanWord.length <= 3) {
+      if (cleanWord.length < 3 || word.match(/^[aeiouy]+$/)) {
         count += 1;
         continue;
       }
       
-      // Count vowel groups as syllables
       let syllableCount = cleanWord.match(/[aeiouy]{1,2}/g)?.length || 1;
       
-      // Adjust for common patterns
       if (cleanWord.endsWith('e') && !cleanWord.endsWith('le')) {
         syllableCount -= 1;
       }
@@ -224,79 +202,70 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
         syllableCount -= 1;
       }
       
-      // Ensure at least one syllable per word
       count += Math.max(1, syllableCount);
     }
     
     return count;
   };
 
-  // Format Wikipedia content based on user preferences
-  const formatWikipediaContent = (content: string, tone: string, length: string): string => {
-    // Split content into paragraphs
+  const formatWikipediaContent = (content: string, tone: string, length: string, targetMaxWords: number = 1200): string => {
     const paragraphs = content.split('\n').filter(p => p.trim() !== '');
     
-    // Adjust length to reach 1000 words target
-    let adjustedParagraphs = paragraphs;
+    const targetMinWords = 1000;
     
-    if (length === "long") {
-      // For long articles, try to get close to 1000 words
-      // If we need more content, we'll duplicate or expand some sections
-      const totalWords = adjustedParagraphs.join(' ').split(/\s+/).length;
-      if (totalWords < 1000) {
-        // Make sure we have enough content by repeating if necessary
-        while (adjustedParagraphs.join(' ').split(/\s+/).length < 1000 && adjustedParagraphs.length < 20) {
-          if (adjustedParagraphs.length > 5) {
-            // Insert some paragraphs in the middle to avoid obvious repetition
-            const midpoint = Math.floor(adjustedParagraphs.length / 2);
-            adjustedParagraphs.splice(midpoint, 0, ...paragraphs.slice(0, Math.min(3, paragraphs.length)));
-          } else {
-            // Just append to the end if we don't have much content yet
-            adjustedParagraphs = [...adjustedParagraphs, ...paragraphs];
-          }
-        }
+    let adjustedParagraphs = [];
+    let currentWordCount = 0;
+    
+    for (let i = 0; i < paragraphs.length; i++) {
+      const paragraphWordCount = paragraphs[i].split(/\s+/).length;
+      
+      if (currentWordCount + paragraphWordCount > targetMaxWords && currentWordCount >= targetMinWords) {
+        break;
       }
-    } else if (length === "medium") {
-      // For medium, aim for around 500 words
-      let wordCount = 0;
-      const mediumParagraphs = [];
-      for (const paragraph of paragraphs) {
-        mediumParagraphs.push(paragraph);
-        wordCount += paragraph.split(/\s+/).length;
-        if (wordCount >= 500) break;
+      
+      adjustedParagraphs.push(paragraphs[i]);
+      currentWordCount += paragraphWordCount;
+      
+      if (currentWordCount >= targetMinWords && 
+          i + 1 < paragraphs.length && 
+          currentWordCount + paragraphs[i+1].split(/\s+/).length > targetMaxWords) {
+        break;
       }
-      adjustedParagraphs = mediumParagraphs;
-    } else if (length === "short") {
-      // For short, aim for around 250 words
-      let wordCount = 0;
-      const shortParagraphs = [];
-      for (const paragraph of paragraphs) {
-        shortParagraphs.push(paragraph);
-        wordCount += paragraph.split(/\s+/).length;
-        if (wordCount >= 250) break;
-      }
-      adjustedParagraphs = shortParagraphs;
     }
     
-    // Apply tone (simplified implementation)
-    let finalContent = adjustedParagraphs.join('\n\n');
+    if (currentWordCount < targetMinWords && paragraphs.length > adjustedParagraphs.length) {
+      for (let i = adjustedParagraphs.length; i < paragraphs.length; i++) {
+        const words = paragraphs[i].split(/\s+/);
+        const wordsNeeded = targetMinWords - currentWordCount;
+        
+        if (wordsNeeded <= 0) break;
+        
+        if (words.length <= wordsNeeded) {
+          adjustedParagraphs.push(paragraphs[i]);
+          currentWordCount += words.length;
+        } else {
+          const truncatedParagraph = words.slice(0, wordsNeeded).join(' ') + '...';
+          adjustedParagraphs.push(truncatedParagraph);
+          currentWordCount += wordsNeeded;
+          break;
+        }
+      }
+    }
     
-    // Convert to markdown format with headers, paragraphs
     let markdownContent = "";
     
-    // Add introduction
-    markdownContent += "## Introduction\n\n";
+    markdownContent += "## **Introduction**\n\n";
     if (adjustedParagraphs.length > 0) {
       markdownContent += adjustedParagraphs[0] + "\n\n";
     }
     
-    // Add main content with appropriate sections
     if (adjustedParagraphs.length > 1) {
-      let sectionCount = Math.min(5, Math.ceil(adjustedParagraphs.length / 3));
-      let paragraphsPerSection = Math.ceil((adjustedParagraphs.length - 1) / sectionCount);
+      const remainingParagraphs = adjustedParagraphs.length - 1;
+      const sectionCount = Math.min(4, Math.ceil(remainingParagraphs / 2));
+      const paragraphsPerSection = Math.ceil(remainingParagraphs / sectionCount);
       
       for (let i = 0; i < sectionCount; i++) {
-        markdownContent += `## ${generateSectionTitle(prompt, i)}\n\n`;
+        markdownContent += `## **${generateSectionTitle(prompt, i)}**\n\n`;
         
         const startIdx = 1 + (i * paragraphsPerSection);
         const endIdx = Math.min(adjustedParagraphs.length, startIdx + paragraphsPerSection);
@@ -307,14 +276,12 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
       }
     }
     
-    // Add conclusion
-    markdownContent += "## Conclusion\n\n";
-    markdownContent += `This article provided comprehensive information about ${prompt}. The content covered key aspects of the topic, including historical context, significant developments, and current relevance. For more detailed information, consider exploring the original Wikipedia sources referenced at the end of this article.`;
+    markdownContent += "## **Conclusion**\n\n";
+    markdownContent += `This article provided essential information about ${prompt}. The content covered key aspects of the topic, including historical context, significant developments, and current relevance. For more detailed information, consider exploring the original Wikipedia sources referenced.`;
     
     return markdownContent;
   };
 
-  // Generate a section title based on the prompt
   const generateSectionTitle = (prompt: string, sectionIndex: number): string => {
     const titles = [
       `Key Aspects of ${prompt}`,
@@ -332,35 +299,28 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
     return titles[sectionIndex % titles.length];
   };
 
-  // Generate hashtags based on the topic
   const generateHashtags = (prompt: string, title: string): string[] => {
     const words = [...new Set([...prompt.split(/\s+/), ...title.split(/\s+/)])];
     const hashtags = [];
     
-    // Generate topic-specific hashtags
     hashtags.push(`#${prompt.replace(/\s+/g, '')}`);
     hashtags.push(`#${title.replace(/\s+/g, '')}`);
     
-    // Generate hashtags from individual words
     for (const word of words) {
       if (word.length > 3 && !hashtags.includes(`#${word}`)) {
         hashtags.push(`#${word}`);
       }
     }
     
-    // Add some generic hashtags
     hashtags.push('#Research');
     hashtags.push('#Knowledge');
     hashtags.push('#Wikipedia');
     hashtags.push('#Learning');
     
-    // Return a limited set to avoid overwhelming
     return hashtags.slice(0, 10);
   };
 
-  // Generate social media captions
   const generateCaptions = (prompt: string, title: string, content: string): string[] => {
-    // Extract the first sentence as a summary
     const firstSentence = content.split('.')[0].trim() + '.';
     
     return [
@@ -372,9 +332,7 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
     ];
   };
 
-  // Generate SEO metadata
   const generateSEOMetadata = (prompt: string, content: string, title: string): SEOMetadata => {
-    // Extract the first paragraph for a description
     const paragraphs = content.split('\n\n');
     let description = '';
     
@@ -385,11 +343,9 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
       }
     }
     
-    // Generate keywords from the content
     const words = content.toLowerCase().split(/\s+/);
     const wordFrequency: {[key: string]: number} = {};
     
-    // Skip common words
     const commonWords = new Set(['the', 'and', 'of', 'to', 'a', 'in', 'for', 'is', 'on', 'that', 'by', 'this', 'with', 'i', 'you', 'it', 'not', 'or', 'be', 'are', 'from', 'at', 'as', 'your']);
     
     for (const word of words) {
@@ -399,18 +355,15 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
       wordFrequency[cleanWord] = (wordFrequency[cleanWord] || 0) + 1;
     }
     
-    // Sort by frequency
     const sortedWords = Object.entries(wordFrequency).sort((a, b) => b[1] - a[1]);
     
-    // Extract top keywords
     const keywords = sortedWords.slice(0, 10).map(entry => entry[0]);
     
-    // Calculate keyword density for top 5 keywords
     const totalWords = words.length;
     const keywordDensity = sortedWords.slice(0, 5).map(([keyword, count]) => ({
       keyword,
       count,
-      density: Math.round((count / totalWords) * 1000) / 10, // Percentage with one decimal
+      density: Math.round((count / totalWords) * 1000) / 10,
     }));
     
     return {
@@ -423,14 +376,12 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
     };
   };
 
-  // Function to optimize image alt text based on the article content
   const generateImageAltText = (image: string, content: string): string => {
     const filenameParts = image.split('/').pop()?.split('?')[0].split('-') || [];
     const keywords = filenameParts
       .filter(word => word.length > 3)
       .map(word => word.replace(/[0-9]/g, ''));
     
-    // Combine with the main topic
     return `${prompt} - ${keywords.join(' ')}`;
   };
 
@@ -448,14 +399,12 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
   };
 
   const submitReview = () => {
-    // Check if all questions have been answered
     const unansweredQuestions = reviewQuestions.filter(q => q.rating === 0);
     if (unansweredQuestions.length > 0) {
       toast.error("Please answer all review questions before submitting");
       return;
     }
 
-    // Calculate average rating
     const totalRating = reviewQuestions.reduce((sum, q) => sum + q.rating, 0);
     const averageRating = totalRating / reviewQuestions.length;
     
@@ -476,9 +425,9 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
   };
 
   const getReadabilityColor = (score: number): string => {
-    if (score < 8) return "text-green-600"; // Easy to read
-    if (score < 12) return "text-amber-600"; // Moderate
-    return "text-red-600"; // Difficult
+    if (score < 8) return "text-green-600";
+    if (score < 12) return "text-amber-600";
+    return "text-red-600";
   };
 
   const toggleImageSelection = (imageUrl: string) => {
@@ -494,7 +443,7 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
   const articleLengthOptions = {
     short: "Short (250-300 words)",
     medium: "Medium (500-600 words)",
-    long: "Long (1000+ words)",
+    long: "Long (1000-1200 words)",
   };
 
   return (
@@ -503,13 +452,13 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
         <div className="text-center">
           <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Wikipedia Article Generator</h1>
           <p className="text-gray-600 mb-6 max-w-2xl mx-auto">
-            Create research-based articles instantly using Wikipedia data
+            Create research-based articles (1000-1200 words) with headers, sub-headers, and formatted text
           </p>
         </div>
 
         <Alert className="bg-blue-50 border-blue-200 text-blue-800 mb-4">
           <AlertDescription>
-            This generator creates articles by gathering and formatting information from Wikipedia. Generate articles up to 1000 words with readability scoring and SEO optimization!
+            This generator creates articles by gathering and formatting information from Wikipedia. Generate articles between 1000-1200 words with bold headings, readability scoring and SEO optimization!
           </AlertDescription>
         </Alert>
 
