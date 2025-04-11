@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -712,4 +713,184 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
                               </h3>
                               <div className="space-y-3">
                                 {captions.map((caption, index) => (
-                                  <div key={index} className="bg-gray-50 dark:bg-gray-800/50 p
+                                  <div key={index} className="bg-gray-50 dark:bg-gray-800/50 p-3 rounded-md relative group">
+                                    <p className="text-gray-800 dark:text-gray-200">{caption}</p>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm" 
+                                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(caption);
+                                        toast.success("Caption copied to clipboard!");
+                                      }}
+                                    >
+                                      <Copy className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </TabsContent>
+            
+            <TabsContent value="settings" className="space-y-6">
+              <Card className="border shadow-md dark:shadow-none dark:border-gray-800">
+                <CardHeader>
+                  <CardTitle className="font-display text-2xl">Format Settings</CardTitle>
+                  <CardDescription>
+                    Customize how your article is generated
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="tone" className="font-medium">Writing Tone</Label>
+                    <Select value={tone} onValueChange={setTone}>
+                      <SelectTrigger id="tone">
+                        <SelectValue placeholder="Select tone" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="professional">Professional & Academic</SelectItem>
+                        <SelectItem value="conversational">Conversational & Friendly</SelectItem>
+                        <SelectItem value="simple">Simple & Direct</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="length" className="font-medium">Article Length</Label>
+                    <Select value={length} onValueChange={setLength}>
+                      <SelectTrigger id="length">
+                        <SelectValue placeholder="Select length" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="long">Long (1000-1200 words)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <Label htmlFor="temperature" className="font-medium">Creativity Level</Label>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">{temperature.toFixed(1)}</span>
+                    </div>
+                    <Slider
+                      id="temperature"
+                      min={0.1}
+                      max={1.0}
+                      step={0.1}
+                      value={[temperature]}
+                      onValueChange={(value) => setTemperature(value[0])}
+                      className="mt-2"
+                    />
+                    <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      <span>Factual</span>
+                      <span>Creative</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            
+            <TabsContent value="seo" className="space-y-6">
+              {seoMetadata && (
+                <>
+                  <Card className="border shadow-md dark:shadow-none dark:border-gray-800">
+                    <CardHeader>
+                      <CardTitle className="font-display text-2xl flex items-center">
+                        <Sparkles className="mr-2 h-5 w-5 text-amber-500" />
+                        SEO Analysis
+                      </CardTitle>
+                      <CardDescription>
+                        Search engine optimization metrics for your article
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                          <div>
+                            <h3 className="text-lg font-medium mb-2">Title</h3>
+                            <div className="bg-gray-50 dark:bg-gray-800/50 p-3 rounded-md">
+                              <p className="text-blue-800 dark:text-blue-300 font-semibold">{seoMetadata.title}</p>
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <h3 className="text-lg font-medium mb-2">Meta Description</h3>
+                            <div className="bg-gray-50 dark:bg-gray-800/50 p-3 rounded-md">
+                              <p className="text-gray-700 dark:text-gray-300 text-sm">{seoMetadata.description}</p>
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <h3 className="text-lg font-medium mb-2">Keywords</h3>
+                            <div className="flex flex-wrap gap-2">
+                              {seoMetadata.keywords.map((keyword, index) => (
+                                <Badge key={index} variant="outline" className="bg-gray-50 dark:bg-gray-800/50">
+                                  {keyword}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-4">
+                          <div>
+                            <h3 className="text-lg font-medium mb-2">Content Metrics</h3>
+                            <div className="bg-gray-50 dark:bg-gray-800/50 p-3 rounded-md space-y-2">
+                              <div className="flex justify-between">
+                                <span className="text-gray-700 dark:text-gray-300">Word Count:</span>
+                                <span className="font-medium">{seoMetadata.wordCount}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-700 dark:text-gray-300">Readability Score:</span>
+                                <span className={`font-medium ${getReadabilityColor(seoMetadata.readabilityScore || 0)}`}>
+                                  {seoMetadata.readabilityScore?.toFixed(1) || "N/A"} - {seoMetadata.readabilityScore ? getReadabilityDescription(seoMetadata.readabilityScore) : "N/A"}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <h3 className="text-lg font-medium mb-2">Keyword Density</h3>
+                            <div className="bg-gray-50 dark:bg-gray-800/50 p-3 rounded-md">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Keyword</TableHead>
+                                    <TableHead className="text-right">Count</TableHead>
+                                    <TableHead className="text-right">Density</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {seoMetadata.keywordDensity.map((item, index) => (
+                                    <TableRow key={index}>
+                                      <TableCell className="font-medium">{item.keyword}</TableCell>
+                                      <TableCell className="text-right">{item.count}</TableCell>
+                                      <TableCell className="text-right">{item.density}%</TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+            </TabsContent>
+          </Tabs>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ArticleGenerator;
