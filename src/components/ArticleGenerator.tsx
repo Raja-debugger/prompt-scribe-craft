@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,7 +8,7 @@ import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Sparkles, Copy, Loader2, Search, Star, Hash, MessageSquareText, FileText, Image as ImageIcon, Folder, Youtube } from "lucide-react";
+import { Sparkles, Copy, Loader2, Search, Star, Hash, MessageSquareText, FileText, Image as ImageIcon, Folder, Youtube, Save, BookText, Link as LinkIcon, History } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -19,6 +18,9 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { YoutubeEmbed } from "@/components/YoutubeEmbed";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import SearchHistory from "./SearchHistory";
+import { v4 as uuidv4 } from "uuid";
 
 interface ArticleGeneratorProps {}
 
@@ -39,6 +41,15 @@ interface SEOMetadata {
     count: number;
     density: number;
   }[];
+}
+
+interface SavedArticle {
+  id: string;
+  title: string;
+  content: string;
+  createdAt: string;
+  lastUpdated: string;
+  type: 'published' | 'draft';
 }
 
 const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
@@ -67,7 +78,13 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
   ]);
   const [reviewSuggestion, setReviewSuggestion] = useState<string>("");
   const [showReview, setShowReview] = useState<boolean>(false);
-
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [articleId, setArticleId] = useState<string>("");
+  const [articleSaved, setArticleSaved] = useState<boolean>(false);
+  
+  const location = useLocation();
+  const navigate = useNavigate();
+  
   const placeholderImages = [
     "https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?w=600&auto=format&fit=crop&q=60",
     "https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=600&auto=format&fit=crop&q=60",
@@ -75,6 +92,94 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
     "https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=600&auto=format&fit=crop&q=60",
     "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=600&auto=format&fit=crop&q=60"
   ];
+
+  useEffect(() => {
+    // Load search history from localStorage
+    const history = localStorage.getItem("searchHistory");
+    if (history) {
+      setSearchHistory(JSON.parse(history));
+    }
+    
+    // Check URL parameters for edit or view mode
+    const params = new URLSearchParams(location.search);
+    const editId = params.get("edit");
+    const viewId = params.get("view");
+    
+    if (editId || viewId) {
+      const id = editId || viewId;
+      const savedArticles = localStorage.getItem("savedArticles");
+      
+      if (savedArticles) {
+        const articles = JSON.parse(savedArticles) as SavedArticle[];
+        const article = articles.find(a => a.id === id);
+        
+        if (article) {
+          // Extract title and main content
+          const titleMatch = article.content.match(/^# \*\*(.*?)\*\*/);
+          const title = titleMatch ? titleMatch[1] : "";
+          
+          setPrompt(title);
+          setGeneratedArticle(article.content);
+          setArticleId(id);
+          setArticleSaved(true);
+          
+          // If it's view mode, disable editing
+          if (viewId) {
+            // TODO: Add view-only mode logic if needed
+          }
+          
+          // Since we're loading an existing article, we need to calculate its stats
+          const readability = calculateReadabilityScore(article.content);
+          setReadabilityScore(readability);
+          
+          const count = countWords(article.content);
+          setWordCount(count);
+          
+          const tags = generateHashtags(title, title);
+          setHashtags(tags);
+          
+          const caps = generateCaptions(title, title, article.content);
+          setCaptions(caps);
+          
+          const seoData = generateSEOMetadata(title, article.content, title);
+          setSeoMetadata(seoData);
+        }
+      }
+    }
+  }, [location]);
+
+  const saveToHistory = useCallback((query: string) => {
+    if (!query.trim()) return;
+    
+    setSearchHistory(prev => {
+      // Remove duplicate if exists
+      const filtered = prev.filter(item => item !== query);
+      // Add to beginning of array
+      const updated = [query, ...filtered].slice(0, 10); // Keep only 10 items
+      // Save to localStorage
+      localStorage.setItem("searchHistory", JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  const clearHistoryItem = (index: number) => {
+    setSearchHistory(prev => {
+      const updated = [...prev];
+      updated.splice(index, 1);
+      localStorage.setItem("searchHistory", JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const clearAllHistory = () => {
+    setSearchHistory([]);
+    localStorage.setItem("searchHistory", JSON.stringify([]));
+    toast.success("Search history cleared");
+  };
+
+  const selectHistoryItem = (item: string) => {
+    setPrompt(item);
+  };
 
   const generateArticle = async () => {
     if (!prompt.trim()) {
@@ -92,8 +197,13 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
     setSuggestedImages([]);
     setSelectedImages([]);
     setSeoMetadata(null);
+    setArticleId("");
+    setArticleSaved(false);
     
     try {
+      // Add topic to search history
+      saveToHistory(prompt);
+      
       const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(prompt)}&format=json&origin=*&srlimit=3`;
       const searchResponse = await fetch(searchUrl);
       const searchData = await searchResponse.json();
@@ -164,6 +274,49 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const saveArticle = (type: 'published' | 'draft') => {
+    if (!generatedArticle) {
+      toast.error("No article to save");
+      return;
+    }
+
+    // Extract title from the article
+    const titleMatch = generatedArticle.match(/^# \*\*(.*?)\*\*/);
+    const title = titleMatch ? titleMatch[1] : "Untitled Article";
+
+    // Create article object
+    const article: SavedArticle = {
+      id: articleId || uuidv4(),
+      title,
+      content: generatedArticle,
+      createdAt: new Date().toISOString(),
+      lastUpdated: new Date().toISOString(),
+      type
+    };
+
+    // Get existing articles from localStorage
+    const existingSavedArticles = localStorage.getItem("savedArticles");
+    let savedArticles: SavedArticle[] = existingSavedArticles ? JSON.parse(existingSavedArticles) : [];
+
+    // If article already exists, update it
+    if (articleId) {
+      savedArticles = savedArticles.map(a => 
+        a.id === articleId ? { ...article, createdAt: a.createdAt } : a
+      );
+    } else {
+      // Otherwise add new article
+      savedArticles.push(article);
+      setArticleId(article.id);
+    }
+
+    // Save to localStorage
+    localStorage.setItem("savedArticles", JSON.stringify(savedArticles));
+    setArticleSaved(true);
+
+    // Show success message
+    toast.success(type === 'published' ? "Article published successfully" : "Draft saved successfully");
   };
 
   const countWords = (text: string): number => {
@@ -315,12 +468,19 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
       }
     }
     
+    // Add more general hashtags
     hashtags.push('#Research');
     hashtags.push('#Knowledge');
     hashtags.push('#Wikipedia');
     hashtags.push('#Learning');
+    hashtags.push('#Education');
+    hashtags.push('#Facts');
+    hashtags.push('#Information');
+    hashtags.push('#Study');
+    hashtags.push('#Academic');
+    hashtags.push('#Educational');
     
-    return hashtags.slice(0, 10);
+    return hashtags.slice(0, 15);
   };
 
   const generateCaptions = (prompt: string, title: string, content: string): string[] => {
@@ -412,6 +572,7 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
     const averageRating = totalRating / reviewQuestions.length;
     
     toast.success(`Thank you for your review! Average rating: ${averageRating.toFixed(1)}/5`);
+    setShowReview(false);
   };
 
   const toggleReviewSection = () => {
@@ -444,13 +605,11 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
   };
 
   const articleLengthOptions = {
-    short: "Short (250-300 words)",
-    medium: "Medium (500-600 words)",
     long: "Long (1000-1200 words)",
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground pt-16">
       <div className="container mx-auto py-8 px-4 max-w-6xl">
         <div className="flex justify-end mb-4">
           <ThemeToggle />
@@ -538,6 +697,16 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
                 </CardFooter>
               </Card>
 
+              {searchHistory.length > 0 && (
+                <SearchHistory 
+                  history={searchHistory}
+                  onSelectHistory={selectHistoryItem}
+                  onClearHistory={clearAllHistory}
+                  onClearHistoryItem={clearHistoryItem}
+                  className="mb-4"
+                />
+              )}
+
               {generatedArticle && (
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -550,7 +719,7 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
                               Your Wikipedia-based article is ready
                             </CardDescription>
                           </div>
-                          <div className="flex space-x-2">
+                          <div className="flex flex-wrap gap-2">
                             <Button variant="outline" onClick={toggleReviewSection} className="font-medium">
                               <Star className="mr-2 h-4 w-4" />
                               Review
@@ -585,312 +754,4 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
                                     <div className="flex items-center cursor-pointer text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">
                                       <span className="font-semibold">Readability Score:</span>
                                       <span className={`ml-1 ${getReadabilityColor(readabilityScore)}`}>{readabilityScore}</span>
-                                      <span className="ml-2 text-xs underline">What's this?</span>
-                                    </div>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-80">
-                                    <div className="space-y-2">
-                                      <h4 className="font-medium">Readability Score Explained</h4>
-                                      <p className="text-sm text-gray-700 dark:text-gray-300">
-                                        This number represents the Flesch-Kincaid Grade Level, indicating the US grade level needed to understand the text.
-                                      </p>
-                                      <div className="text-sm">
-                                        <p><strong>Your score:</strong> {readabilityScore} - {getReadabilityDescription(readabilityScore)}</p>
-                                        <p className="mt-2"><strong>Scale:</strong></p>
-                                        <ul className="list-disc list-inside space-y-1 mt-1">
-                                          <li>1-5: Elementary school</li>
-                                          <li>6-8: Middle school</li>
-                                          <li>9-12: High school</li>
-                                          <li>13+: College level and beyond</li>
-                                        </ul>
-                                      </div>
-                                    </div>
-                                  </PopoverContent>
-                                </Popover>
-                              </div>
-                            </div>
-                          </CardContent>
-                        )}
-                        
-                        <Separator className="my-4" />
-                        
-                        <CardContent className="article-content">
-                          <ReactMarkdown>{generatedArticle}</ReactMarkdown>
-                        </CardContent>
-                      </Card>
-
-                      {showReview && (
-                        <Card className="border shadow-md dark:shadow-none dark:border-gray-800">
-                          <CardHeader>
-                            <CardTitle className="font-display text-xl flex items-center">
-                              <Star className="mr-2 h-5 w-5 text-yellow-500" fill="currentColor" />
-                              Rate This Article
-                            </CardTitle>
-                            <CardDescription>
-                              Help us improve by rating the quality of the generated article
-                            </CardDescription>
-                          </CardHeader>
-                          <CardContent className="space-y-6">
-                            {reviewQuestions.map((question) => (
-                              <div key={question.id} className="space-y-2">
-                                <Label className="font-medium">{question.question}</Label>
-                                <div className="flex items-center space-x-2">
-                                  <RadioGroup 
-                                    value={question.rating.toString()} 
-                                    onValueChange={(value) => handleRatingChange(question.id, parseInt(value))}
-                                    className="flex space-x-2"
-                                  >
-                                    {[1, 2, 3, 4, 5].map((rating) => (
-                                      <div key={rating} className="flex flex-col items-center">
-                                        <RadioGroupItem value={rating.toString()} id={`${question.id}-${rating}`} className="sr-only" />
-                                        <Label 
-                                          htmlFor={`${question.id}-${rating}`}
-                                          className={`cursor-pointer p-1 ${question.rating === rating ? 'text-yellow-500' : 'text-gray-400'}`}
-                                        >
-                                          <Star className={`h-6 w-6 ${question.rating >= rating ? 'fill-yellow-400' : ''}`} />
-                                        </Label>
-                                        <span className="text-xs">{rating}</span>
-                                      </div>
-                                    ))}
-                                  </RadioGroup>
-                                </div>
-                              </div>
-                            ))}
-                            
-                            <div className="space-y-2">
-                              <Label htmlFor="suggestion" className="font-medium">How could we improve this article?</Label>
-                              <Textarea
-                                id="suggestion"
-                                placeholder="Share your suggestions..."
-                                value={reviewSuggestion}
-                                onChange={(e) => setReviewSuggestion(e.target.value)}
-                              />
-                            </div>
-                            
-                            <Button 
-                              onClick={submitReview}
-                              className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 font-medium text-white"
-                            >
-                              Submit Review
-                            </Button>
-                          </CardContent>
-                        </Card>
-                      )}
-                    </div>
-                    
-                    <div className="space-y-6">
-                      <YoutubeEmbed searchTerm={prompt} />
-                      
-                      {hashtags.length > 0 && (
-                        <Card className="border shadow-md dark:shadow-none dark:border-gray-800">
-                          <CardHeader>
-                            <CardTitle className="flex items-center font-display text-xl">
-                              <Hash className="mr-2 h-5 w-5" />
-                              Hashtags & Captions
-                            </CardTitle>
-                            <CardDescription>
-                              Use these for sharing on social media
-                            </CardDescription>
-                          </CardHeader>
-                          <CardContent className="space-y-6">
-                            <div>
-                              <h3 className="text-lg font-medium mb-2">Hashtags</h3>
-                              <div className="flex flex-wrap gap-2">
-                                {hashtags.map((tag, index) => (
-                                  <div key={index} className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 px-3 py-1 rounded-full text-sm">
-                                    {tag}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                            
-                            <Separator />
-                            
-                            <div>
-                              <h3 className="text-lg font-medium mb-2 flex items-center">
-                                <MessageSquareText className="mr-2 h-5 w-5" />
-                                Social Media Captions
-                              </h3>
-                              <div className="space-y-3">
-                                {captions.map((caption, index) => (
-                                  <div key={index} className="bg-gray-50 dark:bg-gray-800/50 p-3 rounded-md relative group">
-                                    <p className="text-gray-800 dark:text-gray-200">{caption}</p>
-                                    <Button 
-                                      variant="ghost" 
-                                      size="sm" 
-                                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                                      onClick={() => {
-                                        navigator.clipboard.writeText(caption);
-                                        toast.success("Caption copied to clipboard!");
-                                      }}
-                                    >
-                                      <Copy className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      )}
-                    </div>
-                  </div>
-                </>
-              )}
-            </TabsContent>
-            
-            <TabsContent value="settings" className="space-y-6">
-              <Card className="border shadow-md dark:shadow-none dark:border-gray-800">
-                <CardHeader>
-                  <CardTitle className="font-display text-2xl">Format Settings</CardTitle>
-                  <CardDescription>
-                    Customize how your article is generated
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="tone" className="font-medium">Writing Tone</Label>
-                    <Select value={tone} onValueChange={setTone}>
-                      <SelectTrigger id="tone">
-                        <SelectValue placeholder="Select tone" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="professional">Professional & Academic</SelectItem>
-                        <SelectItem value="conversational">Conversational & Friendly</SelectItem>
-                        <SelectItem value="simple">Simple & Direct</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="length" className="font-medium">Article Length</Label>
-                    <Select value={length} onValueChange={setLength}>
-                      <SelectTrigger id="length">
-                        <SelectValue placeholder="Select length" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="long">Long (1000-1200 words)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <Label htmlFor="temperature" className="font-medium">Creativity Level</Label>
-                      <span className="text-sm text-gray-500 dark:text-gray-400">{temperature.toFixed(1)}</span>
-                    </div>
-                    <Slider
-                      id="temperature"
-                      min={0.1}
-                      max={1.0}
-                      step={0.1}
-                      value={[temperature]}
-                      onValueChange={(value) => setTemperature(value[0])}
-                      className="mt-2"
-                    />
-                    <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      <span>Factual</span>
-                      <span>Creative</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
-            <TabsContent value="seo" className="space-y-6">
-              {seoMetadata && (
-                <>
-                  <Card className="border shadow-md dark:shadow-none dark:border-gray-800">
-                    <CardHeader>
-                      <CardTitle className="font-display text-2xl flex items-center">
-                        <Sparkles className="mr-2 h-5 w-5 text-amber-500" />
-                        SEO Analysis
-                      </CardTitle>
-                      <CardDescription>
-                        Search engine optimization metrics for your article
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-4">
-                          <div>
-                            <h3 className="text-lg font-medium mb-2">Title</h3>
-                            <div className="bg-gray-50 dark:bg-gray-800/50 p-3 rounded-md">
-                              <p className="text-blue-800 dark:text-blue-300 font-semibold">{seoMetadata.title}</p>
-                            </div>
-                          </div>
-                          
-                          <div>
-                            <h3 className="text-lg font-medium mb-2">Meta Description</h3>
-                            <div className="bg-gray-50 dark:bg-gray-800/50 p-3 rounded-md">
-                              <p className="text-gray-700 dark:text-gray-300 text-sm">{seoMetadata.description}</p>
-                            </div>
-                          </div>
-                          
-                          <div>
-                            <h3 className="text-lg font-medium mb-2">Keywords</h3>
-                            <div className="flex flex-wrap gap-2">
-                              {seoMetadata.keywords.map((keyword, index) => (
-                                <Badge key={index} variant="outline" className="bg-gray-50 dark:bg-gray-800/50">
-                                  {keyword}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <div className="space-y-4">
-                          <div>
-                            <h3 className="text-lg font-medium mb-2">Content Metrics</h3>
-                            <div className="bg-gray-50 dark:bg-gray-800/50 p-3 rounded-md space-y-2">
-                              <div className="flex justify-between">
-                                <span className="text-gray-700 dark:text-gray-300">Word Count:</span>
-                                <span className="font-medium">{seoMetadata.wordCount}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-gray-700 dark:text-gray-300">Readability Score:</span>
-                                <span className={`font-medium ${getReadabilityColor(seoMetadata.readabilityScore || 0)}`}>
-                                  {seoMetadata.readabilityScore?.toFixed(1) || "N/A"} - {seoMetadata.readabilityScore ? getReadabilityDescription(seoMetadata.readabilityScore) : "N/A"}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          <div>
-                            <h3 className="text-lg font-medium mb-2">Keyword Density</h3>
-                            <div className="bg-gray-50 dark:bg-gray-800/50 p-3 rounded-md">
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead>Keyword</TableHead>
-                                    <TableHead className="text-right">Count</TableHead>
-                                    <TableHead className="text-right">Density</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {seoMetadata.keywordDensity.map((item, index) => (
-                                    <TableRow key={index}>
-                                      <TableCell className="font-medium">{item.keyword}</TableCell>
-                                      <TableCell className="text-right">{item.count}</TableCell>
-                                      <TableCell className="text-right">{item.density}%</TableCell>
-                                    </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </>
-              )}
-            </TabsContent>
-          </Tabs>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default ArticleGenerator;
+                                      <span className
