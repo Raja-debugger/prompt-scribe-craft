@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,7 +8,7 @@ import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Sparkles, Copy, Loader2, Search, Star, Hash, MessageSquareText, FileText, Image as ImageIcon, Folder } from "lucide-react";
+import { Sparkles, Copy, Loader2, Search, Star, Hash, MessageSquareText, FileText, Image as ImageIcon, Folder, Youtube } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -16,6 +16,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { YoutubeEmbed } from "@/components/YoutubeEmbed";
 
 interface ArticleGeneratorProps {}
 
@@ -447,535 +449,267 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
   };
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-6xl">
-      <div className="flex flex-col space-y-6">
-        <div className="text-center">
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Wikipedia Article Generator</h1>
-          <p className="text-gray-600 mb-6 max-w-2xl mx-auto">
-            Create research-based articles (1000-1200 words) with headers, sub-headers, and formatted text
-          </p>
+    <div className="min-h-screen bg-background text-foreground">
+      <div className="container mx-auto py-8 px-4 max-w-6xl">
+        <div className="flex justify-end mb-4">
+          <ThemeToggle />
         </div>
+        
+        <div className="flex flex-col space-y-6">
+          <div className="text-center">
+            <h1 className="text-4xl md:text-5xl font-display font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
+              Wikipedia Article Generator
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-2xl mx-auto font-sans">
+              Create research-based articles (1000-1200 words) with bold headings and formatted text
+            </p>
+          </div>
 
-        <Alert className="bg-blue-50 border-blue-200 text-blue-800 mb-4">
-          <AlertDescription>
-            This generator creates articles by gathering and formatting information from Wikipedia. Generate articles between 1000-1200 words with bold headings, readability scoring and SEO optimization!
-          </AlertDescription>
-        </Alert>
+          <Alert className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-300 mb-4">
+            <AlertDescription>
+              This generator creates articles by gathering and formatting information from Wikipedia. Generate articles between 1000-1200 words with bold headings, readability scoring and SEO optimization!
+            </AlertDescription>
+          </Alert>
 
-        <Tabs defaultValue="generate" className="w-full" value={selectedTab} onValueChange={setSelectedTab}>
-          <TabsList className="grid w-full grid-cols-3 mb-6">
-            <TabsTrigger value="generate">Generate Article</TabsTrigger>
-            <TabsTrigger value="settings">Format Settings</TabsTrigger>
-            <TabsTrigger value="seo" disabled={!generatedArticle}>SEO Tools</TabsTrigger>
-          </TabsList>
+          <Tabs defaultValue="generate" className="w-full" value={selectedTab} onValueChange={setSelectedTab}>
+            <TabsList className="grid w-full grid-cols-3 mb-6">
+              <TabsTrigger value="generate" className="font-semibold">Generate Article</TabsTrigger>
+              <TabsTrigger value="settings" className="font-semibold">Format Settings</TabsTrigger>
+              <TabsTrigger value="seo" disabled={!generatedArticle} className="font-semibold">SEO Tools</TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="generate" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>What topic would you like to research?</CardTitle>
-                <CardDescription>
-                  Enter a topic, person, event, or concept to generate an article from Wikipedia
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="topic">Topic</Label>
-                  <Textarea
-                    id="topic"
-                    placeholder="Enter your topic here... (e.g., 'Quantum Physics', 'Leonardo da Vinci', 'Climate Change')"
-                    className="h-40 resize-none"
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="category">Category (Optional)</Label>
-                  <Select value={category} onValueChange={setCategory}>
-                    <SelectTrigger id="category">
-                      <SelectValue placeholder="Select a category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="science">Science</SelectItem>
-                      <SelectItem value="history">History</SelectItem>
-                      <SelectItem value="technology">Technology</SelectItem>
-                      <SelectItem value="art">Art & Culture</SelectItem>
-                      <SelectItem value="business">Business</SelectItem>
-                      <SelectItem value="health">Health & Medicine</SelectItem>
-                      <SelectItem value="general">General Knowledge</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-              <CardFooter className="flex justify-end">
-                <Button 
-                  onClick={generateArticle} 
-                  disabled={isGenerating} 
-                  className="bg-brand-600 hover:bg-brand-700"
-                >
-                  {isGenerating ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Researching...
-                    </>
-                  ) : (
-                    <>
-                      <Search className="mr-2 h-4 w-4" />
-                      Generate Article
-                    </>
-                  )}
-                </Button>
-              </CardFooter>
-            </Card>
+            <TabsContent value="generate" className="space-y-6">
+              <Card className="border shadow-md dark:shadow-none dark:border-gray-800">
+                <CardHeader>
+                  <CardTitle className="font-display text-2xl">What topic would you like to research?</CardTitle>
+                  <CardDescription>
+                    Enter a topic, person, event, or concept to generate an article from Wikipedia
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label htmlFor="topic" className="font-medium">Topic</Label>
+                    <Textarea
+                      id="topic"
+                      placeholder="Enter your topic here... (e.g., 'Quantum Physics', 'Leonardo da Vinci', 'Climate Change')"
+                      className="h-40 resize-none mt-1.5"
+                      value={prompt}
+                      onChange={(e) => setPrompt(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="category" className="font-medium">Category (Optional)</Label>
+                    <Select value={category} onValueChange={setCategory}>
+                      <SelectTrigger id="category" className="mt-1.5">
+                        <SelectValue placeholder="Select a category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="science">Science</SelectItem>
+                        <SelectItem value="history">History</SelectItem>
+                        <SelectItem value="technology">Technology</SelectItem>
+                        <SelectItem value="art">Art & Culture</SelectItem>
+                        <SelectItem value="business">Business</SelectItem>
+                        <SelectItem value="health">Health & Medicine</SelectItem>
+                        <SelectItem value="general">General Knowledge</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardContent>
+                <CardFooter className="flex justify-end">
+                  <Button 
+                    onClick={generateArticle} 
+                    disabled={isGenerating} 
+                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 font-medium px-6 text-white"
+                    size="lg"
+                  >
+                    {isGenerating ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Researching...
+                      </>
+                    ) : (
+                      <>
+                        <Search className="mr-2 h-4 w-4" />
+                        Generate Article
+                      </>
+                    )}
+                  </Button>
+                </CardFooter>
+              </Card>
 
-            {generatedArticle && (
-              <>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <div>
-                      <CardTitle>Generated Article</CardTitle>
-                      <CardDescription>
-                        Your Wikipedia-based article is ready
-                      </CardDescription>
-                    </div>
-                    <div className="flex space-x-2">
-                      <Button variant="outline" onClick={toggleReviewSection}>
-                        <Star className="mr-2 h-4 w-4" />
-                        Review
-                      </Button>
-                      <Button variant="outline" onClick={copyToClipboard}>
-                        <Copy className="mr-2 h-4 w-4" />
-                        Copy
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        onClick={() => setSelectedTab("seo")}
-                      >
-                        <Sparkles className="mr-2 h-4 w-4" />
-                        SEO
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  
-                  {readabilityScore !== null && (
-                    <CardContent className="pb-0">
-                      <div className="flex flex-wrap gap-4 justify-between items-center p-3 bg-gray-50 rounded-md text-sm">
-                        <div>
-                          <span className="font-semibold">Word Count:</span> {wordCount} words
-                        </div>
-                        <div>
-                          <span className="font-semibold">Reading Time:</span> ~{Math.ceil(wordCount / 200)} min
-                        </div>
-                        <div>
-                          <Popover>
-                            <PopoverTrigger>
-                              <div className="flex items-center cursor-pointer text-blue-600 hover:text-blue-800">
-                                <span className="font-semibold">Readability Score:</span>
-                                <span className={`ml-1 ${getReadabilityColor(readabilityScore)}`}>{readabilityScore}</span>
-                                <span className="ml-2 text-xs underline">What's this?</span>
-                              </div>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-80">
-                              <div className="space-y-2">
-                                <h4 className="font-medium">Readability Score Explained</h4>
-                                <p className="text-sm text-gray-700">
-                                  This number represents the Flesch-Kincaid Grade Level, indicating the US grade level needed to understand the text.
-                                </p>
-                                <div className="text-sm">
-                                  <p><strong>Your score:</strong> {readabilityScore} - {getReadabilityDescription(readabilityScore)}</p>
-                                  <p className="mt-2"><strong>Scale:</strong></p>
-                                  <ul className="list-disc list-inside space-y-1 mt-1">
-                                    <li>1-5: Elementary school</li>
-                                    <li>6-8: Middle school</li>
-                                    <li>9-12: High school</li>
-                                    <li>13+: College level and beyond</li>
-                                  </ul>
-                                </div>
-                              </div>
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                      </div>
-                    </CardContent>
-                  )}
-                  
-                  <Separator className="my-4" />
-                  
-                  <CardContent className="prose max-w-none dark:prose-invert">
-                    <ReactMarkdown>{generatedArticle}</ReactMarkdown>
-                  </CardContent>
-                </Card>
-
-                {showReview && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Rate This Article</CardTitle>
-                      <CardDescription>
-                        Help us improve by rating the quality of the generated article
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                      {reviewQuestions.map((question) => (
-                        <div key={question.id} className="space-y-2">
-                          <Label>{question.question}</Label>
-                          <div className="flex items-center space-x-2">
-                            <RadioGroup 
-                              value={question.rating.toString()} 
-                              onValueChange={(value) => handleRatingChange(question.id, parseInt(value))}
-                              className="flex space-x-2"
+              {generatedArticle && (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="md:col-span-2 space-y-6">
+                      <Card className="border shadow-md dark:shadow-none dark:border-gray-800">
+                        <CardHeader className="flex flex-row items-center justify-between">
+                          <div>
+                            <CardTitle className="font-display text-2xl">Generated Article</CardTitle>
+                            <CardDescription>
+                              Your Wikipedia-based article is ready
+                            </CardDescription>
+                          </div>
+                          <div className="flex space-x-2">
+                            <Button variant="outline" onClick={toggleReviewSection} className="font-medium">
+                              <Star className="mr-2 h-4 w-4" />
+                              Review
+                            </Button>
+                            <Button variant="outline" onClick={copyToClipboard} className="font-medium">
+                              <Copy className="mr-2 h-4 w-4" />
+                              Copy
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              onClick={() => setSelectedTab("seo")}
+                              className="font-medium"
                             >
-                              {[1, 2, 3, 4, 5].map((rating) => (
-                                <div key={rating} className="flex flex-col items-center">
-                                  <RadioGroupItem value={rating.toString()} id={`${question.id}-${rating}`} className="sr-only" />
-                                  <Label 
-                                    htmlFor={`${question.id}-${rating}`}
-                                    className={`cursor-pointer p-1 ${question.rating === rating ? 'text-yellow-500' : 'text-gray-400'}`}
-                                  >
-                                    <Star className={`h-6 w-6 ${question.rating >= rating ? 'fill-yellow-400' : ''}`} />
-                                  </Label>
-                                  <span className="text-xs">{rating}</span>
-                                </div>
-                              ))}
-                            </RadioGroup>
+                              <Sparkles className="mr-2 h-4 w-4" />
+                              SEO
+                            </Button>
                           </div>
-                        </div>
-                      ))}
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor="suggestion">How could we improve this article?</Label>
-                        <Textarea
-                          id="suggestion"
-                          placeholder="Share your suggestions..."
-                          value={reviewSuggestion}
-                          onChange={(e) => setReviewSuggestion(e.target.value)}
-                        />
-                      </div>
-                      
-                      <Button onClick={submitReview}>Submit Review</Button>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {hashtags.length > 0 && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center">
-                        <Hash className="mr-2 h-5 w-5" />
-                        Hashtags & Captions
-                      </CardTitle>
-                      <CardDescription>
-                        Use these for sharing on social media
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                      <div>
-                        <h3 className="text-lg font-medium mb-2">Hashtags</h3>
-                        <div className="flex flex-wrap gap-2">
-                          {hashtags.map((tag, index) => (
-                            <div key={index} className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">
-                              {tag}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      
-                      <Separator />
-                      
-                      <div>
-                        <h3 className="text-lg font-medium mb-2 flex items-center">
-                          <MessageSquareText className="mr-2 h-5 w-5" />
-                          Social Media Captions
-                        </h3>
-                        <div className="space-y-3">
-                          {captions.map((caption, index) => (
-                            <div key={index} className="bg-gray-50 p-3 rounded-md relative group">
-                              <p className="text-gray-800">{caption}</p>
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                                onClick={() => {
-                                  navigator.clipboard.writeText(caption);
-                                  toast.success("Caption copied to clipboard!");
-                                }}
-                              >
-                                <Copy className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-              </>
-            )}
-          </TabsContent>
-
-          <TabsContent value="settings" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Formatting Options</CardTitle>
-                <CardDescription>
-                  Customize how your generated article will look and sound
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-3">
-                  <Label>Article Length</Label>
-                  <RadioGroup 
-                    value={length}
-                    onValueChange={setLength}
-                    className="flex flex-col space-y-1"
-                  >
-                    {Object.entries(articleLengthOptions).map(([value, label]) => (
-                      <div className="flex items-center space-x-2" key={value}>
-                        <RadioGroupItem value={value} id={`length-${value}`} />
-                        <Label htmlFor={`length-${value}`}>{label}</Label>
-                      </div>
-                    ))}
-                  </RadioGroup>
-                </div>
-
-                <div className="space-y-3">
-                  <Label>Writing Tone</Label>
-                  <RadioGroup 
-                    value={tone} 
-                    onValueChange={setTone}
-                    className="flex flex-col space-y-1"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="professional" id="tone-professional" />
-                      <Label htmlFor="tone-professional">Professional</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="casual" id="tone-casual" />
-                      <Label htmlFor="tone-casual">Casual</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="simple" id="tone-simple" />
-                      <Label htmlFor="tone-simple">Simple</Label>
-                    </div>
-                  </RadioGroup>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <Label htmlFor="creativity">Creativity Level (Temperature)</Label>
-                    <span className="text-sm text-gray-500">{temperature.toFixed(1)}</span>
-                  </div>
-                  <Slider
-                    id="creativity"
-                    value={[temperature]}
-                    min={0}
-                    max={1}
-                    step={0.1}
-                    onValueChange={(values) => setTemperature(values[0])}
-                  />
-                  <div className="flex justify-between text-xs text-gray-500">
-                    <span>More Factual</span>
-                    <span>More Creative</span>
-                  </div>
-                </div>
-              </CardContent>
-              <CardFooter>
-                <p className="text-sm text-gray-500 italic">
-                  These settings will apply to the next article you generate
-                </p>
-              </CardFooter>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="seo" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>SEO Analysis</CardTitle>
-                <CardDescription>
-                  Search engine optimization metrics and suggestions for your article
-                </CardDescription>
-              </CardHeader>
-              {seoMetadata ? (
-                <CardContent className="space-y-6">
-                  <div className="space-y-3">
-                    <h3 className="text-lg font-medium">Meta Title</h3>
-                    <div className="p-3 bg-gray-50 rounded-md">
-                      <p className="text-blue-600 font-medium">{seoMetadata.title}</p>
-                      <p className="text-green-700 text-sm mt-1">{seoMetadata.description}</p>
-                    </div>
-                    <p className="text-sm text-gray-500">
-                      This is how your article might appear in search engine results.
-                    </p>
-                  </div>
-                  
-                  <Separator />
-                  
-                  <div className="space-y-3">
-                    <h3 className="text-lg font-medium">Keyword Analysis</h3>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Keyword</TableHead>
-                          <TableHead className="text-right">Count</TableHead>
-                          <TableHead className="text-right">Density</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {seoMetadata.keywordDensity.map((keyword) => (
-                          <TableRow key={keyword.keyword}>
-                            <TableCell className="font-medium">{keyword.keyword}</TableCell>
-                            <TableCell className="text-right">{keyword.count}</TableCell>
-                            <TableCell className="text-right">{keyword.density}%</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                  
-                  <Separator />
-                  
-                  <div className="space-y-3">
-                    <h3 className="text-lg font-medium">Recommended Keywords</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {seoMetadata.keywords.map((keyword, index) => (
-                        <Badge key={index} variant="outline" className="bg-gray-50">
-                          {keyword}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <Separator />
-                  
-                  <div className="space-y-3">
-                    <h3 className="text-lg font-medium">Content Stats</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="p-4 bg-gray-50 rounded-md">
-                        <p className="text-sm text-gray-600">Word Count</p>
-                        <p className="text-2xl font-bold">{seoMetadata.wordCount}</p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {seoMetadata.wordCount < 300 ? "Consider adding more content" : 
-                           seoMetadata.wordCount >= 1000 ? "Excellent length" : "Good length"}
-                        </p>
-                      </div>
-                      <div className="p-4 bg-gray-50 rounded-md">
-                        <p className="text-sm text-gray-600">Readability</p>
-                        <p className="text-2xl font-bold">{seoMetadata.readabilityScore}</p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {getReadabilityDescription(seoMetadata.readabilityScore || 0)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              ) : (
-                <CardContent>
-                  <div className="p-8 text-center">
-                    <p className="text-gray-500">Generate an article first to view SEO analysis</p>
-                  </div>
-                </CardContent>
-              )}
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <ImageIcon className="mr-2 h-5 w-5" />
-                  Image Suggestions
-                </CardTitle>
-                <CardDescription>
-                  Select images to complement your article
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Tabs value={activeImageTab} onValueChange={setActiveImageTab} className="w-full">
-                  <TabsList className="grid w-full grid-cols-2 mb-4">
-                    <TabsTrigger value="suggested">Suggested Images</TabsTrigger>
-                    <TabsTrigger value="selected">Selected ({selectedImages.length})</TabsTrigger>
-                  </TabsList>
-                  
-                  <TabsContent value="suggested" className="space-y-4">
-                    {suggestedImages.length > 0 ? (
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {suggestedImages.map((image, index) => (
-                          <div 
-                            key={index} 
-                            className={`rounded-md overflow-hidden border-2 cursor-pointer relative ${
-                              selectedImages.includes(image) ? 'border-blue-500' : 'border-transparent'
-                            }`}
-                            onClick={() => toggleImageSelection(image)}
-                          >
-                            <img 
-                              src={image} 
-                              alt={generateImageAltText(image, generatedArticle)} 
-                              className="w-full h-48 object-cover"
-                            />
-                            <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 hover:bg-opacity-20 transition-all">
-                              {selectedImages.includes(image) && (
-                                <div className="bg-blue-500 text-white p-2 rounded-full">
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                  </svg>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center p-8">
-                        <p className="text-gray-500">No images suggested yet. Generate an article first.</p>
-                      </div>
-                    )}
-                  </TabsContent>
-                  
-                  <TabsContent value="selected">
-                    {selectedImages.length > 0 ? (
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {selectedImages.map((image, index) => (
-                            <div key={index} className="rounded-md overflow-hidden border relative group">
-                              <img 
-                                src={image} 
-                                alt={generateImageAltText(image, generatedArticle)} 
-                                className="w-full h-48 object-cover"
-                              />
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleImageSelection(image);
-                                }}
-                              >
-                                Remove
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
+                        </CardHeader>
                         
-                        <div className="bg-blue-50 p-4 rounded-md">
-                          <h4 className="font-medium text-blue-800 mb-2">Usage Tips</h4>
-                          <ul className="list-disc list-inside text-sm text-blue-700 space-y-1">
-                            <li>For best results, place images between main sections of your article</li>
-                            <li>Always add proper alt text to improve accessibility and SEO</li>
-                            <li>Ensure you have the right to use these images for your specific purpose</li>
-                          </ul>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-center p-8">
-                        <p className="text-gray-500">No images selected yet. Select from the suggested images tab.</p>
-                      </div>
-                    )}
-                  </TabsContent>
-                </Tabs>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
-    </div>
-  );
-};
+                        {readabilityScore !== null && (
+                          <CardContent className="pb-0">
+                            <div className="flex flex-wrap gap-4 justify-between items-center p-3 bg-gray-50 dark:bg-gray-800/50 rounded-md text-sm">
+                              <div>
+                                <span className="font-semibold">Word Count:</span> {wordCount} words
+                              </div>
+                              <div>
+                                <span className="font-semibold">Reading Time:</span> ~{Math.ceil(wordCount / 200)} min
+                              </div>
+                              <div>
+                                <Popover>
+                                  <PopoverTrigger>
+                                    <div className="flex items-center cursor-pointer text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">
+                                      <span className="font-semibold">Readability Score:</span>
+                                      <span className={`ml-1 ${getReadabilityColor(readabilityScore)}`}>{readabilityScore}</span>
+                                      <span className="ml-2 text-xs underline">What's this?</span>
+                                    </div>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-80">
+                                    <div className="space-y-2">
+                                      <h4 className="font-medium">Readability Score Explained</h4>
+                                      <p className="text-sm text-gray-700 dark:text-gray-300">
+                                        This number represents the Flesch-Kincaid Grade Level, indicating the US grade level needed to understand the text.
+                                      </p>
+                                      <div className="text-sm">
+                                        <p><strong>Your score:</strong> {readabilityScore} - {getReadabilityDescription(readabilityScore)}</p>
+                                        <p className="mt-2"><strong>Scale:</strong></p>
+                                        <ul className="list-disc list-inside space-y-1 mt-1">
+                                          <li>1-5: Elementary school</li>
+                                          <li>6-8: Middle school</li>
+                                          <li>9-12: High school</li>
+                                          <li>13+: College level and beyond</li>
+                                        </ul>
+                                      </div>
+                                    </div>
+                                  </PopoverContent>
+                                </Popover>
+                              </div>
+                            </div>
+                          </CardContent>
+                        )}
+                        
+                        <Separator className="my-4" />
+                        
+                        <CardContent className="article-content">
+                          <ReactMarkdown>{generatedArticle}</ReactMarkdown>
+                        </CardContent>
+                      </Card>
 
-export default ArticleGenerator;
+                      {showReview && (
+                        <Card className="border shadow-md dark:shadow-none dark:border-gray-800">
+                          <CardHeader>
+                            <CardTitle className="font-display text-xl flex items-center">
+                              <Star className="mr-2 h-5 w-5 text-yellow-500" fill="currentColor" />
+                              Rate This Article
+                            </CardTitle>
+                            <CardDescription>
+                              Help us improve by rating the quality of the generated article
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent className="space-y-6">
+                            {reviewQuestions.map((question) => (
+                              <div key={question.id} className="space-y-2">
+                                <Label className="font-medium">{question.question}</Label>
+                                <div className="flex items-center space-x-2">
+                                  <RadioGroup 
+                                    value={question.rating.toString()} 
+                                    onValueChange={(value) => handleRatingChange(question.id, parseInt(value))}
+                                    className="flex space-x-2"
+                                  >
+                                    {[1, 2, 3, 4, 5].map((rating) => (
+                                      <div key={rating} className="flex flex-col items-center">
+                                        <RadioGroupItem value={rating.toString()} id={`${question.id}-${rating}`} className="sr-only" />
+                                        <Label 
+                                          htmlFor={`${question.id}-${rating}`}
+                                          className={`cursor-pointer p-1 ${question.rating === rating ? 'text-yellow-500' : 'text-gray-400'}`}
+                                        >
+                                          <Star className={`h-6 w-6 ${question.rating >= rating ? 'fill-yellow-400' : ''}`} />
+                                        </Label>
+                                        <span className="text-xs">{rating}</span>
+                                      </div>
+                                    ))}
+                                  </RadioGroup>
+                                </div>
+                              </div>
+                            ))}
+                            
+                            <div className="space-y-2">
+                              <Label htmlFor="suggestion" className="font-medium">How could we improve this article?</Label>
+                              <Textarea
+                                id="suggestion"
+                                placeholder="Share your suggestions..."
+                                value={reviewSuggestion}
+                                onChange={(e) => setReviewSuggestion(e.target.value)}
+                              />
+                            </div>
+                            
+                            <Button 
+                              onClick={submitReview}
+                              className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 font-medium text-white"
+                            >
+                              Submit Review
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+                    
+                    <div className="space-y-6">
+                      <YoutubeEmbed searchTerm={prompt} />
+                      
+                      {hashtags.length > 0 && (
+                        <Card className="border shadow-md dark:shadow-none dark:border-gray-800">
+                          <CardHeader>
+                            <CardTitle className="flex items-center font-display text-xl">
+                              <Hash className="mr-2 h-5 w-5" />
+                              Hashtags & Captions
+                            </CardTitle>
+                            <CardDescription>
+                              Use these for sharing on social media
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent className="space-y-6">
+                            <div>
+                              <h3 className="text-lg font-medium mb-2">Hashtags</h3>
+                              <div className="flex flex-wrap gap-2">
+                                {hashtags.map((tag, index) => (
+                                  <div key={index} className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 px-3 py-1 rounded-full text-sm">
+                                    {tag}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            
+                            <Separator />
+                            
+                            <div>
+                              <h3 className="text-lg font-medium mb-2 flex items-center">
+                                <MessageSquareText className="mr-2 h-5 w-5" />
+                                Social Media Captions
+                              </h3>
+                              <div className="space-y-3">
+                                {captions.map((caption, index) => (
+                                  <div key={index} className="bg-gray-50 dark:bg-gray-800/50 p
