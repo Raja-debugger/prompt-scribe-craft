@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Star } from "lucide-react";
 import { toast } from "sonner";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 
 interface ReviewQuestion {
@@ -71,20 +70,19 @@ const ReviewDialog: React.FC<ReviewDialogProps> = ({
           {reviewQuestions.map((question) => (
             <div key={question.id} className="space-y-2">
               <p className="font-medium text-sm">{question.question}</p>
-              <RadioGroup 
-                value={question.rating.toString()} 
-                onValueChange={(value) => handleRatingChange(question.id, parseInt(value))}
-                className="flex space-x-2"
-              >
-                {[1, 2, 3, 4, 5].map((value) => (
-                  <div key={value} className="flex items-center space-x-1">
-                    <RadioGroupItem value={value.toString()} id={`${question.id}-${value}`} />
-                    <Label htmlFor={`${question.id}-${value}`} className="text-sm">
-                      {value}
-                    </Label>
-                  </div>
+              <div className="flex space-x-1">
+                {[1, 2, 3, 4, 5].map((rating) => (
+                  <Star
+                    key={rating}
+                    className={`h-6 w-6 cursor-pointer ${
+                      question.rating >= rating
+                        ? "fill-yellow-400 text-yellow-400"
+                        : "text-gray-300"
+                    }`}
+                    onClick={() => handleRatingChange(question.id, rating)}
+                  />
                 ))}
-              </RadioGroup>
+              </div>
             </div>
           ))}
           
