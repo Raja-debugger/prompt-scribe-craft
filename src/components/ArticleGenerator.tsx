@@ -756,4 +756,369 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
                               <div>
                                 <Popover>
                                   <PopoverTrigger>
-                                    <div className="flex items-center cursor-pointer text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300
+                                    <div className="flex items-center cursor-pointer text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">
+                                      <span className="font-semibold">Readability:</span>
+                                      <span className={`ml-1 ${getReadabilityColor(readabilityScore)}`}>
+                                        {readabilityScore} ({getReadabilityDescription(readabilityScore)})
+                                      </span>
+                                    </div>
+                                  </PopoverTrigger>
+                                  <PopoverContent>
+                                    <div className="space-y-2">
+                                      <h4 className="font-semibold">Readability Score Explanation</h4>
+                                      <p className="text-sm text-muted-foreground">
+                                        The readability score estimates the education level needed to understand the text:
+                                      </p>
+                                      <ul className="text-sm space-y-1">
+                                        <li><span className="text-green-600 font-medium">5-8:</span> Easy to read (middle school level)</li>
+                                        <li><span className="text-amber-600 font-medium">9-12:</span> Moderate to read (high school/early college)</li>
+                                        <li><span className="text-red-600 font-medium">13+:</span> Difficult to read (college level and above)</li>
+                                      </ul>
+                                    </div>
+                                  </PopoverContent>
+                                </Popover>
+                              </div>
+                            </div>
+                          </CardContent>
+                        )}
+                        
+                        <CardContent className="prose prose-sm dark:prose-invert max-w-none pt-6">
+                          <ReactMarkdown>{generatedArticle}</ReactMarkdown>
+                        </CardContent>
+                        
+                        <CardFooter className="flex justify-between flex-wrap gap-2 pt-4">
+                          {!articleSaved ? (
+                            <>
+                              <Button 
+                                variant="default" 
+                                onClick={() => saveArticle('published')}
+                                className="font-medium"
+                              >
+                                <Save className="mr-2 h-4 w-4" />
+                                Publish
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                onClick={() => saveArticle('draft')}
+                                className="font-medium"
+                              >
+                                <FileText className="mr-2 h-4 w-4" />
+                                Save as Draft
+                              </Button>
+                            </>
+                          ) : (
+                            <div className="flex items-center text-green-600 dark:text-green-400">
+                              <span className="text-sm">Article saved</span>
+                            </div>
+                          )}
+                          
+                          <Link to="/saved-articles">
+                            <Button variant="outline" className="font-medium">
+                              <Folder className="mr-2 h-4 w-4" />
+                              View Saved Articles
+                            </Button>
+                          </Link>
+                        </CardFooter>
+                      </Card>
+                      
+                      {showReview && (
+                        <Card className="border shadow-md dark:shadow-none dark:border-gray-800">
+                          <CardHeader>
+                            <CardTitle className="font-display text-xl">Review This Article</CardTitle>
+                            <CardDescription>
+                              Please rate the quality of the generated article
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent className="space-y-4">
+                            {reviewQuestions.map((question) => (
+                              <div key={question.id} className="space-y-2">
+                                <h4 className="font-medium text-sm">{question.question}</h4>
+                                <RadioGroup 
+                                  value={question.rating.toString()} 
+                                  onValueChange={(value) => handleRatingChange(question.id, parseInt(value))}
+                                  className="flex space-x-2"
+                                >
+                                  {[1, 2, 3, 4, 5].map((rating) => (
+                                    <div key={rating} className="flex items-center space-x-1">
+                                      <RadioGroupItem value={rating.toString()} id={`${question.id}-${rating}`} />
+                                      <Label htmlFor={`${question.id}-${rating}`}>{rating}</Label>
+                                    </div>
+                                  ))}
+                                </RadioGroup>
+                              </div>
+                            ))}
+                            
+                            <div className="space-y-2">
+                              <Label htmlFor="review-suggestion" className="font-medium text-sm">
+                                Any suggestions for improvement?
+                              </Label>
+                              <Textarea 
+                                id="review-suggestion"
+                                placeholder="Your feedback helps us improve..."
+                                value={reviewSuggestion}
+                                onChange={(e) => setReviewSuggestion(e.target.value)}
+                                className="resize-none h-24"
+                              />
+                            </div>
+                          </CardContent>
+                          <CardFooter>
+                            <Button onClick={submitReview} className="w-full font-medium">
+                              Submit Review
+                            </Button>
+                          </CardFooter>
+                        </Card>
+                      )}
+                    </div>
+                    
+                    <div className="space-y-6">
+                      <Card className="border shadow-md dark:shadow-none dark:border-gray-800">
+                        <CardHeader>
+                          <CardTitle className="text-lg font-medium">Share on Social Media</CardTitle>
+                          <CardDescription>
+                            Captions and hashtags for your article
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                          <div className="space-y-2">
+                            <Label className="font-medium text-sm">Ready-to-use Captions</Label>
+                            <div className="space-y-3">
+                              {captions.map((caption, index) => (
+                                <div key={index} className="group relative p-3 bg-gray-50 dark:bg-gray-800/50 rounded-md">
+                                  <p className="text-sm">{caption}</p>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(caption);
+                                      toast.success("Caption copied to clipboard!");
+                                    }}
+                                  >
+                                    <Copy className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label className="font-medium text-sm">Hashtags</Label>
+                            <div className="flex flex-wrap gap-2">
+                              {hashtags.map((hashtag, index) => (
+                                <Badge key={index} variant="default" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-800"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(hashtag);
+                                    toast.success("Hashtag copied!");
+                                  }}
+                                >
+                                  {hashtag}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                      
+                      <YoutubeEmbed searchTerm={prompt} />
+                    </div>
+                  </div>
+                </>
+              )}
+            </TabsContent>
+
+            <TabsContent value="settings" className="space-y-6">
+              <Card className="border shadow-md dark:shadow-none dark:border-gray-800">
+                <CardHeader>
+                  <CardTitle className="font-display text-xl">Article Format Settings</CardTitle>
+                  <CardDescription>
+                    Customize the tone and style of your generated article
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="tone" className="font-medium">Tone</Label>
+                    <Select value={tone} onValueChange={setTone}>
+                      <SelectTrigger id="tone">
+                        <SelectValue placeholder="Select a tone" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="professional">Professional</SelectItem>
+                        <SelectItem value="casual">Casual</SelectItem>
+                        <SelectItem value="academic">Academic</SelectItem>
+                        <SelectItem value="informal">Informal</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Professional is suitable for most topics and creates balanced content.
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label className="font-medium">Article Length</Label>
+                    <div className="grid grid-cols-1 gap-2">
+                      <div className="flex items-center">
+                        <RadioGroupItem id="length-long" value="long" checked={length === "long"} />
+                        <Label htmlFor="length-long" className="ml-2 cursor-pointer">
+                          {articleLengthOptions.long}
+                        </Label>
+                      </div>
+                    </div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Research articles typically perform best at 1000+ words for comprehensive coverage.
+                    </p>
+                  </div>
+                  
+                  <Separator />
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="temperature" className="font-medium">Creativity Level (Temperature)</Label>
+                    <div className="flex flex-col space-y-1">
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-500 dark:text-gray-400">Conservative</span>
+                        <span className="text-sm text-gray-500 dark:text-gray-400">Creative</span>
+                      </div>
+                      <Slider
+                        id="temperature"
+                        min={0.1}
+                        max={1}
+                        step={0.1}
+                        value={[temperature]}
+                        onValueChange={(value) => setTemperature(value[0])}
+                      />
+                      <div className="text-center text-sm font-medium mt-2">
+                        {temperature.toFixed(1)}
+                      </div>
+                    </div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Higher values allow more creativity in the wikipedia content rearrangement. Lower values stick more closely to the source.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="seo" className="space-y-6">
+              <Card className="border shadow-md dark:shadow-none dark:border-gray-800">
+                <CardHeader>
+                  <CardTitle className="font-display text-xl">SEO Analysis</CardTitle>
+                  <CardDescription>
+                    Optimize your article for search engines
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {seoMetadata ? (
+                    <>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label className="font-medium">Title</Label>
+                          <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-md">
+                            <p className="text-sm font-medium">{seoMetadata.title}</p>
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label className="font-medium">Meta Description</Label>
+                          <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-md">
+                            <p className="text-sm">{seoMetadata.description}</p>
+                          </div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {seoMetadata.description.length}/160 characters
+                            {seoMetadata.description.length > 160 && " (Exceeds recommended length)"}
+                          </p>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label className="font-medium">Focus Keywords</Label>
+                          <div className="flex flex-wrap gap-2">
+                            {seoMetadata.keywords.map((keyword, index) => (
+                              <Badge key={index} variant={index < 3 ? "default" : "secondary"}>
+                                {keyword}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                        
+                        <Separator />
+                        
+                        <div className="space-y-3">
+                          <h4 className="font-medium text-base">Content Analysis</h4>
+                          
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center">
+                              <Label className="text-sm">Word Count</Label>
+                              <Badge variant={wordCount >= 1000 ? "default" : "secondary"}>
+                                {wordCount} words
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              Optimal article length for SEO is typically 1000-1500 words.
+                            </p>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center">
+                              <Label className="text-sm">Readability Score</Label>
+                              <Badge 
+                                variant={
+                                  readabilityScore !== null && readabilityScore < 10 
+                                    ? "default"
+                                    : "secondary"
+                                }
+                              >
+                                {readabilityScore !== null ? readabilityScore.toFixed(1) : "N/A"}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              Scores between 6-10 are ideal for general audiences.
+                            </p>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label className="text-sm">Keyword Density</Label>
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Keyword</TableHead>
+                                  <TableHead>Count</TableHead>
+                                  <TableHead>Density</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {seoMetadata.keywordDensity.map((item, index) => (
+                                  <TableRow key={index}>
+                                    <TableCell className="font-medium">{item.keyword}</TableCell>
+                                    <TableCell>{item.count}</TableCell>
+                                    <TableCell>{item.density}%</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              Aim for keyword density between 1-2% for primary keywords.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8">
+                      <p className="text-gray-500 dark:text-gray-400 mb-4">
+                        Generate an article first to see SEO analysis
+                      </p>
+                      <Button onClick={() => setSelectedTab("generate")}>
+                        <FileText className="mr-2 h-4 w-4" />
+                        Go to Generator
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ArticleGenerator;
