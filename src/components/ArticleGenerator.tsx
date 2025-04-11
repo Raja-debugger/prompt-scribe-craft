@@ -479,6 +479,11 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
     hashtags.push('#Study');
     hashtags.push('#Academic');
     hashtags.push('#Educational');
+    hashtags.push('#TodayILearned');
+    hashtags.push('#FactOfTheDay');
+    hashtags.push('#DidYouKnow');
+    hashtags.push('#KnowledgeIsPower');
+    hashtags.push('#Insights');
     
     return hashtags.slice(0, 15);
   };
@@ -751,7 +756,4 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
                               <div>
                                 <Popover>
                                   <PopoverTrigger>
-                                    <div className="flex items-center cursor-pointer text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">
-                                      <span className="font-semibold">Readability Score:</span>
-                                      <span className={`ml-1 ${getReadabilityColor(readabilityScore)}`}>{readabilityScore}</span>
-                                      <span className
+                                    <div className="flex items-center cursor-pointer text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300
