@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,8 +9,10 @@ import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Video, Film, Download, Clock, Sparkles, Settings, Check } from "lucide-react";
+import { Video, Film, Download, Clock, Sparkles, Settings, Check, RotateCw } from "lucide-react";
 import { toast } from "sonner";
+import { motion, AnimatePresence } from "framer-motion";
+import { runwayAPI } from "@/utils/runwayAPI";
 
 interface VideoGeneratorProps {
   articleContent: string;
@@ -52,7 +55,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
 
   const generateVideo = async () => {
     if (!apiKey) {
-      toast.error("Please enter your Lumen5 API key");
+      toast.error("Please enter your RunwayML API key");
       return;
     }
 
@@ -61,56 +64,40 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
     
     // Create a summary of the article
     const summary = summarizeContent(articleContent, 150);
+    const prompt = `Create a professional video about ${articleTitle}: ${summary}`;
     
     try {
-      // Simulate API progress for demo purposes
+      // Set up progress simulation
       const interval = setInterval(() => {
         setProgress(prev => {
           if (prev >= 95) {
             clearInterval(interval);
             return 95;
           }
-          return prev + Math.floor(Math.random() * 10);
+          return prev + Math.floor(Math.random() * 5);
         });
       }, 800);
       
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      // Configure the RunwayML API with the provided key
+      runwayAPI.setApiKey(apiKey);
       
-      // In a real implementation, you would call the Lumen5 API here
-      /* 
-      const response = await fetch('https://api.lumen5.com/videos', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-          title: articleTitle,
-          content: summary,
-          duration: duration,
-          // Other Lumen5 specific parameters
-        })
+      // Generate the video
+      const videoResponse = await runwayAPI.generateVideo({
+        prompt: prompt,
+        aspectRatio: "16:9",
+        duration: duration
       });
       
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to generate video');
-      }
-      
-      setVideoUrl(data.videoUrl);
-      */
-      
-      // For demo, set a sample video URL
       clearInterval(interval);
       setProgress(100);
       
-      // Using a placeholder video for demo
-      setVideoUrl("https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4");
-      
-      toast.success("Video generated successfully!");
-      setActiveTab("preview");
+      if (videoResponse.status === "completed" && videoResponse.url) {
+        setVideoUrl(videoResponse.url);
+        toast.success("Video generated successfully!");
+        setActiveTab("preview");
+      } else {
+        throw new Error("Video generation did not complete successfully");
+      }
     } catch (error) {
       console.error("Error generating video:", error);
       toast.error("Failed to generate video. Please try again.");
@@ -119,15 +106,38 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
     }
   };
 
+  // Animation variants for smooth transitions
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: { 
+      opacity: 1,
+      transition: { 
+        duration: 0.5,
+        when: "beforeChildren",
+        staggerChildren: 0.1
+      }
+    },
+    exit: {
+      opacity: 0,
+      transition: { duration: 0.3 }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: { y: 0, opacity: 1 },
+    exit: { y: -20, opacity: 0 }
+  };
+
   return (
-    <Card className="w-full max-w-3xl mx-auto">
+    <Card className="w-full max-w-3xl mx-auto overflow-hidden">
       <CardHeader>
         <CardTitle className="flex items-center">
           <Film className="mr-2 h-5 w-5" />
           Video Generator
         </CardTitle>
         <CardDescription>
-          Generate a short video summarizing your article using Lumen5 API
+          Generate a short video summarizing your article using RunwayML AI
         </CardDescription>
       </CardHeader>
       
@@ -137,147 +147,189 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({
           <TabsTrigger value="preview" disabled={!videoUrl}>Preview</TabsTrigger>
         </TabsList>
         
-        <TabsContent value="generate">
-          <CardContent className="space-y-4 pt-4">
-            {showApiInput && (
-              <div className="space-y-2">
-                <Label htmlFor="api-key">Lumen5 API Key</Label>
-                <div className="flex space-x-2">
-                  <Input
-                    id="api-key"
-                    type="password"
-                    placeholder="Enter your Lumen5 API key"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                  />
+        <AnimatePresence mode="wait">
+          {activeTab === "generate" && (
+            <TabsContent value="generate" key="generate-tab">
+              <motion.div
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                className="space-y-4"
+              >
+                <CardContent className="space-y-4 pt-4">
+                  {showApiInput && (
+                    <motion.div variants={itemVariants} className="space-y-2">
+                      <Label htmlFor="api-key">RunwayML API Key</Label>
+                      <div className="flex space-x-2">
+                        <Input
+                          id="api-key"
+                          type="password"
+                          placeholder="Enter your RunwayML API key"
+                          value={apiKey}
+                          onChange={(e) => setApiKey(e.target.value)}
+                        />
+                        <Button 
+                          variant="outline" 
+                          onClick={() => {
+                            if (apiKey) {
+                              setShowApiInput(false);
+                              toast.success("API Key saved!");
+                            }
+                          }}
+                          disabled={!apiKey}
+                        >
+                          <Check className="h-4 w-4 mr-1" /> Save
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Your API key is only stored locally in this browser session
+                      </p>
+                    </motion.div>
+                  )}
+                  
+                  {!showApiInput && (
+                    <motion.div variants={itemVariants}>
+                      <Alert className="bg-muted border-primary/20">
+                        <Check className="h-4 w-4 text-primary" />
+                        <AlertTitle>API Key Configured</AlertTitle>
+                        <AlertDescription className="flex justify-between items-center">
+                          <span>Your RunwayML API key is ready to use</span>
+                          <Button variant="link" onClick={() => setShowApiInput(true)} className="h-auto p-0">
+                            Change
+                          </Button>
+                        </AlertDescription>
+                      </Alert>
+                    </motion.div>
+                  )}
+                  
+                  <Separator />
+                  
+                  <motion.div variants={itemVariants} className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <Label>Video Duration</Label>
+                      <span className="text-sm text-muted-foreground">{duration} seconds</span>
+                    </div>
+                    <Slider
+                      min={10}
+                      max={30}
+                      step={1}
+                      value={[duration]}
+                      onValueChange={(value) => setDuration(value[0])}
+                      className="mt-2"
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>10s</span>
+                      <span>20s</span>
+                      <span>30s</span>
+                    </div>
+                  </motion.div>
+                  
+                  <motion.div variants={itemVariants} className="space-y-2">
+                    <Label>Content Summary</Label>
+                    <div className="p-3 bg-muted rounded-md text-sm">
+                      {summarizeContent(articleContent, 150)}
+                    </div>
+                  </motion.div>
+                  
+                  {isGenerating && (
+                    <motion.div 
+                      variants={itemVariants}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="space-y-2"
+                    >
+                      <div className="flex justify-between items-center">
+                        <Label>Generation Progress</Label>
+                        <span className="text-sm">{progress}%</span>
+                      </div>
+                      <Progress value={progress} className="h-2" />
+                      <p className="text-xs text-muted-foreground animate-pulse flex items-center">
+                        <RotateCw className="h-3 w-3 mr-2 animate-spin" />
+                        Processing your article content...
+                      </p>
+                    </motion.div>
+                  )}
+                </CardContent>
+                
+                <CardFooter className="flex justify-between">
+                  <Button variant="outline" onClick={onClose}>
+                    Cancel
+                  </Button>
                   <Button 
-                    variant="outline" 
-                    onClick={() => {
-                      if (apiKey) {
-                        setShowApiInput(false);
-                        toast.success("API Key saved!");
-                      }
-                    }}
-                    disabled={!apiKey}
+                    onClick={generateVideo} 
+                    disabled={isGenerating || !apiKey}
+                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
                   >
-                    <Check className="h-4 w-4 mr-1" /> Save
+                    {isGenerating ? (
+                      <>
+                        <Clock className="mr-2 h-4 w-4 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="mr-2 h-4 w-4" />
+                        Generate Video
+                      </>
+                    )}
                   </Button>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Your API key is only stored locally in this browser session
-                </p>
-              </div>
-            )}
-            
-            {!showApiInput && (
-              <Alert className="bg-muted border-primary/20">
-                <Check className="h-4 w-4 text-primary" />
-                <AlertTitle>API Key Configured</AlertTitle>
-                <AlertDescription className="flex justify-between items-center">
-                  <span>Your Lumen5 API key is ready to use</span>
-                  <Button variant="link" onClick={() => setShowApiInput(true)} className="h-auto p-0">
-                    Change
-                  </Button>
-                </AlertDescription>
-              </Alert>
-            )}
-            
-            <Separator />
-            
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <Label>Video Duration</Label>
-                <span className="text-sm text-muted-foreground">{duration} seconds</span>
-              </div>
-              <Slider
-                min={10}
-                max={30}
-                step={1}
-                value={[duration]}
-                onValueChange={(value) => setDuration(value[0])}
-              />
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>10s</span>
-                <span>20s</span>
-                <span>30s</span>
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label>Content Summary</Label>
-              <div className="p-3 bg-muted rounded-md text-sm">
-                {summarizeContent(articleContent, 150)}
-              </div>
-            </div>
-            
-            {isGenerating && (
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <Label>Generation Progress</Label>
-                  <span className="text-sm">{progress}%</span>
-                </div>
-                <Progress value={progress} className="h-2" />
-                <p className="text-xs text-muted-foreground animate-pulse">
-                  Processing your article content...
-                </p>
-              </div>
-            )}
-          </CardContent>
+                </CardFooter>
+              </motion.div>
+            </TabsContent>
+          )}
           
-          <CardFooter className="flex justify-between">
-            <Button variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={generateVideo} 
-              disabled={isGenerating || !apiKey}
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
-            >
-              {isGenerating ? (
-                <>
-                  <Clock className="mr-2 h-4 w-4 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="mr-2 h-4 w-4" />
-                  Generate Video
-                </>
-              )}
-            </Button>
-          </CardFooter>
-        </TabsContent>
-        
-        <TabsContent value="preview">
-          <CardContent className="space-y-4 pt-4">
-            <div className="relative rounded-md overflow-hidden aspect-video bg-black">
-              {videoUrl && (
-                <video
-                  controls
-                  className="w-full h-full"
-                  src={videoUrl}
-                >
-                  Your browser does not support the video tag.
-                </video>
-              )}
-            </div>
-            
-            <div className="flex justify-center">
-              <Button variant="outline" className="mr-2" onClick={() => setActiveTab("generate")}>
-                <Settings className="mr-2 h-4 w-4" />
-                Adjust Settings
-              </Button>
-              <Button onClick={() => {
-                // In a real implementation, this would download the video
-                window.open(videoUrl, '_blank');
-                toast.success("Video download started");
-              }}>
-                <Download className="mr-2 h-4 w-4" />
-                Download Video
-              </Button>
-            </div>
-          </CardContent>
-        </TabsContent>
+          {activeTab === "preview" && (
+            <TabsContent value="preview" key="preview-tab">
+              <motion.div
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                className="space-y-4"
+              >
+                <CardContent className="space-y-4 pt-4">
+                  <motion.div 
+                    variants={itemVariants}
+                    className="relative rounded-md overflow-hidden aspect-video bg-black"
+                  >
+                    {videoUrl && (
+                      <video
+                        controls
+                        className="w-full h-full"
+                        src={videoUrl}
+                        autoPlay
+                      >
+                        Your browser does not support the video tag.
+                      </video>
+                    )}
+                  </motion.div>
+                  
+                  <motion.div variants={itemVariants} className="flex justify-center">
+                    <Button variant="outline" className="mr-2" onClick={() => setActiveTab("generate")}>
+                      <Settings className="mr-2 h-4 w-4" />
+                      Adjust Settings
+                    </Button>
+                    <Button onClick={() => {
+                      // In a real implementation, this would download the video
+                      if (videoUrl) {
+                        const a = document.createElement('a');
+                        a.href = videoUrl;
+                        a.download = `${articleTitle.replace(/\s+/g, '-')}-video.mp4`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        toast.success("Video download started");
+                      }
+                    }}>
+                      <Download className="mr-2 h-4 w-4" />
+                      Download Video
+                    </Button>
+                  </motion.div>
+                </CardContent>
+              </motion.div>
+            </TabsContent>
+          )}
+        </AnimatePresence>
       </Tabs>
     </Card>
   );
