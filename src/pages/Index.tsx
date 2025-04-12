@@ -2,7 +2,7 @@
 import ArticleGenerator from "@/components/ArticleGenerator";
 import Navbar from "@/components/Navbar";
 import { SidebarNav, sidebarNavItems } from "@/components/SidebarNav";
-import AIChatbot from "@/components/AIChatbot";
+import ImprovedAIChatbot from "@/components/ImprovedAIChatbot";
 import { motion } from "framer-motion";
 
 const Index = () => {
@@ -46,8 +46,8 @@ const Index = () => {
         </div>
       </motion.div>
       
-      {/* Add the AI Chatbot */}
-      <AIChatbot />
+      {/* Add the improved AI Chatbot */}
+      <ImprovedAIChatbot />
     </div>
   );
 };

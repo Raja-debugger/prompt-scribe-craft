@@ -1,66 +1,62 @@
 
 import { toast } from "sonner";
 
-interface RunwayVideoGenerationParams {
-  prompt: string;
-  aspectRatio?: "16:9" | "9:16" | "1:1";
-  duration?: number;
+interface RunwayVoiceGenerationParams {
+  text: string;
+  voice?: string;
 }
 
-interface RunwayVideoResponse {
+interface RunwayVoiceResponse {
   id: string;
   status: "started" | "processing" | "completed" | "failed";
   url?: string;
 }
 
-const RUNWAY_API_URL = "https://api.runwayml.com/v1";
 // Using a dedicated API key for the application
 const RUNWAY_API_KEY = "rw_8kfhdGTj66JvZGyhsAVMpV7wZIFBJZgLsN4KnPb3sMOkw";
 
 class RunwayAPI {
-  async generateVideo(params: RunwayVideoGenerationParams): Promise<RunwayVideoResponse> {
+  async generateVoiceOver(params: RunwayVoiceGenerationParams): Promise<RunwayVoiceResponse> {
     try {
-      console.log("Starting video generation with prompt:", params.prompt);
+      console.log("Starting voice over generation with text:", params.text);
       
       // In a real implementation, this would make an actual API call
       // For this demo, we'll simulate the API response
-      const mockVideoId = `video-${Date.now()}`;
+      const mockVoiceId = `voice-${Date.now()}`;
       
       // Notify the user that generation has started
-      toast.info("Video generation has started", {
-        description: "This process typically takes 1-2 minutes.",
+      toast.info("Voice over generation has started", {
+        description: "This process typically takes a few seconds.",
         duration: 3000
       });
       
-      // Simulate the video generation process with realistic timing
-      const mockResponse: RunwayVideoResponse = {
-        id: mockVideoId,
+      // Simulate the voice over generation process with realistic timing
+      const mockResponse: RunwayVoiceResponse = {
+        id: mockVoiceId,
         status: "started"
       };
 
-      // Simulate processing state after 2 seconds
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Simulate processing state after 1 second
+      await new Promise(resolve => setTimeout(resolve, 1000));
       mockResponse.status = "processing";
       
-      // Simulate completion after 3 more seconds
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // Simulate completion after 2 more seconds
+      await new Promise(resolve => setTimeout(resolve, 2000));
       mockResponse.status = "completed";
       
       // In a real implementation, this URL would come from the API
-      // For demo, use sample videos based on topics
-      const sampleVideos = [
-        "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-        "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
-        "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
-        "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
-        "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4"
+      // For demo, use sample audio files based on text
+      const sampleAudios = [
+        "https://audio-samples.github.io/samples/mp3/blizzard_biased/sample-1.mp3",
+        "https://audio-samples.github.io/samples/mp3/blizzard_biased/sample-2.mp3",
+        "https://audio-samples.github.io/samples/mp3/blizzard_biased/sample-3.mp3"
       ];
       
-      // Choose a video based on the hash of the prompt to get consistent results for the same topic
-      const promptHash = params.prompt.split("").reduce((hash, char) => char.charCodeAt(0) + hash, 0);
-      mockResponse.url = sampleVideos[promptHash % sampleVideos.length];
+      // Choose an audio based on the hash of the text to get consistent results for the same topic
+      const textHash = params.text.split("").reduce((hash, char) => char.charCodeAt(0) + hash, 0);
+      mockResponse.url = sampleAudios[textHash % sampleAudios.length];
       
-      console.log("Video generation completed:", mockResponse);
+      console.log("Voice over generation completed:", mockResponse);
       return mockResponse;
     } catch (error) {
       console.error("RunwayML API error:", error);
@@ -68,16 +64,16 @@ class RunwayAPI {
     }
   }
 
-  async getVideoStatus(videoId: string): Promise<RunwayVideoResponse> {
+  async getVoiceStatus(voiceId: string): Promise<RunwayVoiceResponse> {
     try {
-      console.log("Checking status for video:", videoId);
+      console.log("Checking status for voice over:", voiceId);
       
       // In a real implementation, this would make an actual API call
       // For this demo, we'll simulate the API response
-      const mockResponse: RunwayVideoResponse = {
-        id: videoId,
+      const mockResponse: RunwayVoiceResponse = {
+        id: voiceId,
         status: "completed",
-        url: "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+        url: "https://audio-samples.github.io/samples/mp3/blizzard_biased/sample-1.mp3"
       };
       
       return mockResponse;
