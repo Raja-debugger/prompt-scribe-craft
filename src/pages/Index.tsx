@@ -4,6 +4,7 @@ import ProfileSection from "@/components/ProfileSection";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import Navbar from "@/components/Navbar";
 import { SidebarNav, sidebarNavItems } from "@/components/SidebarNav";
+import AIChatbot from "@/components/AIChatbot";
 
 const Index = () => {
   return (
@@ -30,6 +31,9 @@ const Index = () => {
           </div>
         </div>
       </div>
+      
+      {/* Add the AI Chatbot */}
+      <AIChatbot />
     </div>
   );
 };
