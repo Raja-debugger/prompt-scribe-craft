@@ -766,4 +766,339 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
                               </div>
                             </PopoverTrigger>
                             <PopoverContent className="w-80">
-                              <div className="space-
+                              <div className="space-y-2">
+                                <h4 className="font-medium">Readability Analysis</h4>
+                                <p className="text-sm">
+                                  Score: <span className={getReadabilityColor(readabilityScore)}>{readabilityScore}</span>
+                                  <br />
+                                  Reading Level: {getReadabilityDescription(readabilityScore)}
+                                </p>
+                                <div className="text-xs text-muted-foreground">
+                                  This score is based on the Flesch-Kincaid readability formula.
+                                  Lower scores indicate more complex text.
+                                </div>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      </div>
+                    </CardContent>
+                  )}
+                  
+                  <CardContent className="prose dark:prose-invert max-w-none mt-4">
+                    <ReactMarkdown>{generatedArticle}</ReactMarkdown>
+                  </CardContent>
+                  
+                  <CardFooter className="flex justify-between flex-wrap gap-2">
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        onClick={() => saveArticle('draft')}
+                        className="font-medium"
+                      >
+                        <Save className="mr-2 h-4 w-4" />
+                        Save as Draft
+                      </Button>
+                      <Button 
+                        variant="gradient" 
+                        onClick={() => saveArticle('published')}
+                        className="font-medium bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+                      >
+                        <FileText className="mr-2 h-4 w-4" />
+                        Publish Article
+                      </Button>
+                    </div>
+                    
+                    {articleSaved && (
+                      <Badge variant="outline" className="ml-auto bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400 border-green-200 dark:border-green-800">
+                        {articleId ? "Saved" : "New Draft"}
+                      </Badge>
+                    )}
+                  </CardFooter>
+                </Card>
+              </div>
+              
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Images</CardTitle>
+                    <CardDescription>Suggested images for your article</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <Tabs defaultValue="suggested" value={activeImageTab} onValueChange={setActiveImageTab}>
+                      <TabsList className="grid grid-cols-2 w-full">
+                        <TabsTrigger value="suggested">Suggested</TabsTrigger>
+                        <TabsTrigger value="selected" disabled={selectedImages.length === 0}>Selected ({selectedImages.length})</TabsTrigger>
+                      </TabsList>
+                      
+                      <TabsContent value="suggested" className="mt-4">
+                        <div className="grid gap-3">
+                          {suggestedImages.map((image, index) => (
+                            <div key={index} className="relative group">
+                              <img 
+                                src={image} 
+                                alt={generateImageAltText(image, generatedArticle)} 
+                                className={`w-full h-32 object-cover rounded-md transition-all ${
+                                  selectedImages.includes(image) 
+                                    ? "ring-2 ring-primary" 
+                                    : "hover:opacity-90"
+                                }`}
+                              />
+                              <Button 
+                                size="sm" 
+                                variant={selectedImages.includes(image) ? "destructive" : "secondary"}
+                                className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={() => toggleImageSelection(image)}
+                              >
+                                {selectedImages.includes(image) ? "Remove" : "Select"}
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </TabsContent>
+                      
+                      <TabsContent value="selected" className="mt-4">
+                        {selectedImages.length > 0 ? (
+                          <div className="grid gap-3">
+                            {selectedImages.map((image, index) => (
+                              <div key={index} className="relative group">
+                                <img 
+                                  src={image} 
+                                  alt={generateImageAltText(image, generatedArticle)}
+                                  className="w-full h-32 object-cover rounded-md hover:opacity-90 transition-all ring-2 ring-primary"
+                                />
+                                <Button 
+                                  size="sm" 
+                                  variant="destructive"
+                                  className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={() => toggleImageSelection(image)}
+                                >
+                                  Remove
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center p-4 text-muted-foreground">
+                            No images selected
+                          </div>
+                        )}
+                      </TabsContent>
+                    </Tabs>
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Social Media</CardTitle>
+                    <CardDescription>Ready-to-use social media content</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <Label className="text-sm font-medium mb-2">Captions</Label>
+                      <div className="space-y-2 mt-1">
+                        {captions.map((caption, index) => (
+                          <div key={index} className="relative group">
+                            <div className="p-3 rounded-md bg-muted text-sm">
+                              {caption}
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="absolute top-2 right-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() => {
+                                navigator.clipboard.writeText(caption);
+                                toast.success("Caption copied to clipboard");
+                              }}
+                            >
+                              <Copy className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <Label className="text-sm font-medium mb-2">Hashtags</Label>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {hashtags.map((tag, index) => (
+                          <Badge 
+                            key={index} 
+                            variant="secondary"
+                            className="cursor-pointer hover:bg-secondary/80"
+                            onClick={() => {
+                              navigator.clipboard.writeText(tag);
+                              toast.success("Hashtag copied");
+                            }}
+                          >
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          )}
+        </TabsContent>
+        
+        <TabsContent value="settings" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Article Format Settings</CardTitle>
+              <CardDescription>
+                Customize how your generated article will be formatted
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="tone">Writing Tone</Label>
+                <Select value={tone} onValueChange={setTone}>
+                  <SelectTrigger id="tone">
+                    <SelectValue placeholder="Select a tone" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="professional">Professional</SelectItem>
+                    <SelectItem value="conversational">Conversational</SelectItem>
+                    <SelectItem value="academic">Academic</SelectItem>
+                    <SelectItem value="simple">Simple</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <Label htmlFor="temperature">Creativity Level</Label>
+                  <span className="text-sm text-muted-foreground">{temperature.toFixed(1)}</span>
+                </div>
+                <Slider
+                  id="temperature"
+                  min={0.1}
+                  max={1.0}
+                  step={0.1}
+                  value={[temperature]}
+                  onValueChange={(values) => setTemperature(values[0])}
+                />
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Conservative</span>
+                  <span>Creative</span>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="length">Article Length</Label>
+                <Select value={length} onValueChange={setLength}>
+                  <SelectTrigger id="length">
+                    <SelectValue placeholder="Select length" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="long">{articleLengthOptions.long}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="seo" className="space-y-6">
+          {seoMetadata && (
+            <>
+              <Card>
+                <CardHeader>
+                  <CardTitle>SEO Analysis</CardTitle>
+                  <CardDescription>
+                    Key metrics about your article for search engines
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Title</Label>
+                    <div className="p-3 rounded-md bg-muted">
+                      <p className="text-base">{seoMetadata.title}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Meta Description</Label>
+                    <div className="p-3 rounded-md bg-muted">
+                      <p className="text-sm">{seoMetadata.description}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Keywords</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {seoMetadata.keywords.map((keyword, index) => (
+                        <Badge key={index} variant="outline">{keyword}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Keyword Density</Label>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Keyword</TableHead>
+                          <TableHead className="text-right">Count</TableHead>
+                          <TableHead className="text-right">Density</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {seoMetadata.keywordDensity.map((item, index) => (
+                          <TableRow key={index}>
+                            <TableCell>{item.keyword}</TableCell>
+                            <TableCell className="text-right">{item.count}</TableCell>
+                            <TableCell className="text-right">{item.density}%</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Word Count</Label>
+                      <div className="p-3 rounded-md bg-muted text-sm">
+                        {seoMetadata.wordCount} words
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Readability Score</Label>
+                      <div className="p-3 rounded-md bg-muted text-sm">
+                        {seoMetadata.readabilityScore !== null ? 
+                          <>
+                            <span className={getReadabilityColor(seoMetadata.readabilityScore)}>
+                              {seoMetadata.readabilityScore}
+                            </span> 
+                            - {getReadabilityDescription(seoMetadata.readabilityScore)}
+                          </> : 
+                          "Not available"
+                        }
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </TabsContent>
+      </Tabs>
+      
+      {/* Video Generator Dialog */}
+      <Dialog open={showVideoGenerator} onOpenChange={setShowVideoGenerator}>
+        <DialogContent className="sm:max-w-3xl">
+          <VideoGenerator 
+            articleContent={generatedArticle} 
+            articleTitle={seoMetadata?.title || prompt}
+            onClose={() => setShowVideoGenerator(false)} 
+          />
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+export default ArticleGenerator;
