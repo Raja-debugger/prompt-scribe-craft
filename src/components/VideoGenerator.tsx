@@ -7,7 +7,7 @@ interface VideoGeneratorProps {
   onClose: () => void;
 }
 
-// This is now just a wrapper component that renders the VoiceOver component
+// This component serves as a wrapper for the VoiceOver component
 const VideoGenerator: React.FC<VideoGeneratorProps> = ({
   articleContent,
   articleTitle,

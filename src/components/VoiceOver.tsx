@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Volume2, Pause, Play, RotateCw, Check, VolumeX, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
+import { runwayAPI } from "@/utils/runwayAPI";
 
 interface VoiceOverProps {
   articleContent: string;
@@ -27,8 +28,8 @@ const VoiceOver: React.FC<VoiceOverProps> = ({
   const [audioUrl, setAudioUrl] = useState<string>("");
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<string>("generate");
-  const [audioRef, setAudioRef] = useState<HTMLAudioElement | null>(null);
   const [volume, setVolume] = useState<number>(80);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   
   // Function to summarize article content
   const summarizeContent = (content: string, maxLength: number = 500): string => {
@@ -70,39 +71,39 @@ const VoiceOver: React.FC<VoiceOverProps> = ({
         });
       }, 600);
       
-      // Mock voice generation - in a real implementation, this would call ElevenLabs API
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // Generate voice using the Runway API
+      const response = await runwayAPI.generateVoiceOver({
+        text: summary,
+        voice: "default" // You can specify a voice if needed
+      });
       
-      // For demo purposes, use sample audio. In a real implementation, this would be the URL from the API
-      // Sample professional narration audio files
-      const sampleAudios = [
-        "https://audio-samples.github.io/samples/mp3/blizzard_biased/sample-1.mp3",
-        "https://audio-samples.github.io/samples/mp3/blizzard_biased/sample-2.mp3",
-        "https://audio-samples.github.io/samples/mp3/blizzard_biased/sample-3.mp3"
-      ];
-      
-      // Choose a consistent audio file based on the article title
-      const titleHash = articleTitle.split("").reduce((hash, char) => char.charCodeAt(0) + hash, 0);
-      const audioUrl = sampleAudios[titleHash % sampleAudios.length];
-      
-      setAudioUrl(audioUrl);
       clearInterval(interval);
       setProgress(100);
-      toast.success("Voice over generated successfully!");
-      setActiveTab("listen");
       
-      // Create audio element
-      const audio = new Audio(audioUrl);
-      setAudioRef(audio);
-      
-      // Set volume
-      audio.volume = volume / 100;
-      
-      // Add event listeners
-      audio.addEventListener("ended", () => setIsPlaying(false));
-      audio.addEventListener("pause", () => setIsPlaying(false));
-      audio.addEventListener("play", () => setIsPlaying(true));
-      
+      if (response.url) {
+        console.log("Setting audio URL to:", response.url);
+        setAudioUrl(response.url);
+        
+        // Create new audio element
+        const audio = new Audio(response.url);
+        audioRef.current = audio;
+        
+        // Set volume
+        audio.volume = volume / 100;
+        
+        // Add event listeners
+        audio.addEventListener("ended", () => setIsPlaying(false));
+        audio.addEventListener("pause", () => setIsPlaying(false));
+        audio.addEventListener("play", () => setIsPlaying(true));
+        
+        // Preload audio
+        audio.load();
+        
+        toast.success("Voice over generated successfully!");
+        setActiveTab("listen");
+      } else {
+        throw new Error("No audio URL returned from API");
+      }
     } catch (error) {
       console.error("Error generating voice over:", error);
       toast.error("Failed to generate voice over. Please try again.");
@@ -113,15 +114,22 @@ const VoiceOver: React.FC<VoiceOverProps> = ({
 
   // Handle play/pause
   const togglePlayback = () => {
-    if (!audioRef) return;
-    
-    if (isPlaying) {
-      audioRef.pause();
-    } else {
-      audioRef.play();
+    if (!audioRef.current) {
+      console.error("No audio reference available");
+      return;
     }
     
-    setIsPlaying(!isPlaying);
+    console.log("Toggling playback. Current state:", isPlaying, "Audio source:", audioRef.current.src);
+    
+    if (isPlaying) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.play()
+        .catch(error => {
+          console.error("Failed to play audio:", error);
+          toast.error("Failed to play audio. Please try again.");
+        });
+    }
   };
 
   // Handle volume change
@@ -129,25 +137,34 @@ const VoiceOver: React.FC<VoiceOverProps> = ({
     const newVolume = value[0];
     setVolume(newVolume);
     
-    if (audioRef) {
-      audioRef.volume = newVolume / 100;
+    if (audioRef.current) {
+      audioRef.current.volume = newVolume / 100;
     }
   };
 
   // Clean up on component unmount
   useEffect(() => {
     return () => {
-      if (audioRef) {
-        audioRef.pause();
-        audioRef.src = "";
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = "";
       }
     };
-  }, [audioRef]);
+  }, []);
 
   // Auto-generate the voice over when component mounts
   useEffect(() => {
     generateVoiceOver();
   }, []);
+  
+  // Effect to update audio when URL changes
+  useEffect(() => {
+    if (audioUrl && audioRef.current) {
+      console.log("Updating audio element with URL:", audioUrl);
+      audioRef.current.src = audioUrl;
+      audioRef.current.load();
+    }
+  }, [audioUrl]);
 
   // Animation variants for smooth transitions
   const containerVariants = {
@@ -312,6 +329,17 @@ const VoiceOver: React.FC<VoiceOverProps> = ({
                     <p className="text-sm text-muted-foreground text-center max-w-md">
                       Listen to the AI voice over summary of your article
                     </p>
+                    
+                    {/* Debugging: Audio element for visibility during testing */}
+                    <audio 
+                      controls 
+                      className="mt-4 w-full max-w-md" 
+                      src={audioUrl}
+                      ref={audioRef}
+                      onPlay={() => setIsPlaying(true)}
+                      onPause={() => setIsPlaying(false)}
+                      onEnded={() => setIsPlaying(false)}
+                    />
                   </motion.div>
                   
                   <motion.div variants={itemVariants} className="space-y-2">

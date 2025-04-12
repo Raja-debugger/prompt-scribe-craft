@@ -56,7 +56,7 @@ class RunwayAPI {
       const textHash = params.text.split("").reduce((hash, char) => char.charCodeAt(0) + hash, 0);
       mockResponse.url = sampleAudios[textHash % sampleAudios.length];
       
-      console.log("Voice over generation completed:", mockResponse);
+      console.log("Voice over generation completed with URL:", mockResponse.url);
       return mockResponse;
     } catch (error) {
       console.error("RunwayML API error:", error);
