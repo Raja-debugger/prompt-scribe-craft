@@ -1,6 +1,5 @@
 
 import ArticleGenerator from "@/components/ArticleGenerator";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import Navbar from "@/components/Navbar";
 import { SidebarNav, sidebarNavItems } from "@/components/SidebarNav";
 import AIChatbot from "@/components/AIChatbot";
@@ -12,9 +11,9 @@ const Index = () => {
       <Navbar />
       
       <motion.div 
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.6 }}
         className="container mx-auto py-8 px-4 max-w-6xl relative"
       >
         <div className="flex flex-col md:flex-row gap-8">
@@ -37,8 +36,8 @@ const Index = () => {
           </motion.aside>
           
           <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, duration: 0.5 }}
             className="flex-1"
           >

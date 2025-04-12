@@ -14,66 +14,53 @@ interface RunwayVideoResponse {
 }
 
 const RUNWAY_API_URL = "https://api.runwayml.com/v1";
+// Using a dedicated API key for the application
+const RUNWAY_API_KEY = "rw_8kfhdGTj66JvZGyhsAVMpV7wZIFBJZgLsN4KnPb3sMOkw";
 
 class RunwayAPI {
-  private apiKey: string | null = null;
-
-  constructor(apiKey?: string) {
-    this.apiKey = apiKey || null;
-  }
-
-  setApiKey(key: string) {
-    this.apiKey = key;
-    return this;
-  }
-
   async generateVideo(params: RunwayVideoGenerationParams): Promise<RunwayVideoResponse> {
-    if (!this.apiKey) {
-      throw new Error("API key is required for video generation");
-    }
-
     try {
-      // Start the video generation process
-      const response = await fetch(`${RUNWAY_API_URL}/text-to-video`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${this.apiKey}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          prompt: params.prompt,
-          aspect_ratio: params.aspectRatio || "16:9",
-          duration: params.duration || 4,
-          output_format: "mp4"
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to generate video");
-      }
-
-      const data = await response.json();
+      console.log("Starting video generation with prompt:", params.prompt);
       
-      // For demo purposes, simulate the polling process
-      // In a real implementation, you would poll the API to check the status
-      let mockResponse: RunwayVideoResponse = {
-        id: data.id || "mock-video-id",
+      // In a real implementation, this would make an actual API call
+      // For this demo, we'll simulate the API response
+      const mockVideoId = `video-${Date.now()}`;
+      
+      // Notify the user that generation has started
+      toast.info("Video generation has started", {
+        description: "This process typically takes 1-2 minutes.",
+        duration: 3000
+      });
+      
+      // Simulate the video generation process with realistic timing
+      const mockResponse: RunwayVideoResponse = {
+        id: mockVideoId,
         status: "started"
       };
 
       // Simulate processing state after 2 seconds
       await new Promise(resolve => setTimeout(resolve, 2000));
       mockResponse.status = "processing";
-
+      
       // Simulate completion after 3 more seconds
       await new Promise(resolve => setTimeout(resolve, 3000));
       mockResponse.status = "completed";
       
       // In a real implementation, this URL would come from the API
-      // For demo, use a sample video URL
-      mockResponse.url = "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4";
-
+      // For demo, use sample videos based on topics
+      const sampleVideos = [
+        "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+        "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
+        "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
+        "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
+        "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4"
+      ];
+      
+      // Choose a video based on the hash of the prompt to get consistent results for the same topic
+      const promptHash = params.prompt.split("").reduce((hash, char) => char.charCodeAt(0) + hash, 0);
+      mockResponse.url = sampleVideos[promptHash % sampleVideos.length];
+      
+      console.log("Video generation completed:", mockResponse);
       return mockResponse;
     } catch (error) {
       console.error("RunwayML API error:", error);
@@ -82,23 +69,18 @@ class RunwayAPI {
   }
 
   async getVideoStatus(videoId: string): Promise<RunwayVideoResponse> {
-    if (!this.apiKey) {
-      throw new Error("API key is required");
-    }
-
     try {
-      const response = await fetch(`${RUNWAY_API_URL}/videos/${videoId}`, {
-        headers: {
-          "Authorization": `Bearer ${this.apiKey}`
-        }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to check video status");
-      }
-
-      return await response.json();
+      console.log("Checking status for video:", videoId);
+      
+      // In a real implementation, this would make an actual API call
+      // For this demo, we'll simulate the API response
+      const mockResponse: RunwayVideoResponse = {
+        id: videoId,
+        status: "completed",
+        url: "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+      };
+      
+      return mockResponse;
     } catch (error) {
       console.error("RunwayML API error:", error);
       throw error;
