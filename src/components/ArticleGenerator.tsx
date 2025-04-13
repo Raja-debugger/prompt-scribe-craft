@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,7 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Sparkles, Copy, Loader2, Search, Star, Hash, MessageSquareText, FileText, 
   Image as ImageIcon, Folder, Youtube, Save, BookText, Link as LinkIcon, 
-  History, ArrowDown, ArrowUp, Video, X } from "lucide-react";
+  History, ArrowDown, ArrowUp, Video, X, Headphones } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -26,6 +26,7 @@ import { v4 as uuidv4 } from "uuid";
 import ArticleReviewButton from "./ArticleReviewButton";
 import VideoGenerator from "./VideoGenerator";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { runwayAPI } from "@/utils/runwayAPI";
 
 interface ArticleGeneratorProps {}
 
@@ -90,6 +91,15 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
   // Add new state for video generation
   const [showVideoGenerator, setShowVideoGenerator] = useState<boolean>(false);
   const [transitionClass, setTransitionClass] = useState<string>("");
+  
+  // Add new state for summary and audio
+  const [summarizedContent, setSummarizedContent] = useState<string>("");
+  const [showSummary, setShowSummary] = useState<boolean>(false);
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState<boolean>(false);
+  const [showVoiceOver, setShowVoiceOver] = useState<boolean>(false);
+  const [voiceOverAudio, setVoiceOverAudio] = useState<string | null>(null);
+  const [isGeneratingVoiceOver, setIsGeneratingVoiceOver] = useState<boolean>(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   
   const location = useLocation();
   const navigate = useNavigate();
@@ -159,6 +169,145 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
       }
     }
   }, [location]);
+
+  // Add summarize article function
+  const summarizeArticle = async () => {
+    if (!generatedArticle) {
+      toast.error("Please generate an article first");
+      return;
+    }
+    
+    setIsGeneratingSummary(true);
+    setSummarizedContent("");
+    
+    try {
+      // Extract title from the article
+      const titleMatch = generatedArticle.match(/^# \*\*(.*?)\*\*/);
+      const title = titleMatch ? titleMatch[1] : "Article";
+      
+      // Extract main content without title and source
+      const mainContent = generatedArticle
+        .replace(/^# \*\*.*?\*\*\n\n/, '')
+        .replace(/\n\n---\n\*Source.*\*$/, '');
+      
+      // Create a summary using a simple algorithm (in a real app, you'd use an AI service)
+      const paragraphs = mainContent.split('\n\n').filter(p => p && !p.startsWith('#'));
+      const firstParagraph = paragraphs[0] || "";
+      
+      // Get first sentence from each section
+      const sections = mainContent.split(/^## \*\*.*?\*\*$/m).filter(Boolean);
+      const firstSentences = sections.map(section => {
+        const sentences = section.split(/\.\s+/);
+        return sentences[0] ? sentences[0] + '.' : '';
+      }).filter(Boolean);
+      
+      // Combine into a summary
+      let summary = `# **Summary: ${title}**\n\n`;
+      summary += firstParagraph + "\n\n";
+      
+      if (firstSentences.length > 0) {
+        summary += "## **Key Points**\n\n";
+        firstSentences.forEach(sentence => {
+          summary += `- ${sentence}\n`;
+        });
+      }
+      
+      // Set the summary
+      setSummarizedContent(summary);
+      setShowSummary(true);
+      toast.success("Summary generated successfully!");
+    } catch (error) {
+      console.error("Error summarizing article:", error);
+      toast.error("Failed to summarize article");
+    } finally {
+      setIsGeneratingSummary(false);
+    }
+  };
+  
+  // Generate voice over for the summary
+  const generateVoiceOver = async () => {
+    if (!summarizedContent) {
+      // If no summary exists, generate one first
+      await summarizeArticle();
+    }
+    
+    if (!summarizedContent) {
+      toast.error("Please summarize the article first");
+      return;
+    }
+    
+    setIsGeneratingVoiceOver(true);
+    
+    try {
+      // Extract plain text from the markdown for the voice over
+      const plainText = summarizedContent
+        .replace(/^# \*\*.*?\*\*\n\n/, '')
+        .replace(/## \*\*.*?\*\*/g, '')
+        .replace(/- /g, '');
+      
+      console.log("Generating voice over for:", plainText);
+      
+      // Call the Runway API to generate the voice over
+      const response = await runwayAPI.generateVoiceOver({
+        text: plainText.substring(0, 1000), // Limit text to 1000 chars if needed
+        voice: "narrator" // Use a default voice
+      });
+      
+      if (response.url) {
+        console.log("Voice over generated successfully:", response.url);
+        setVoiceOverAudio(response.url);
+        setShowVoiceOver(true);
+        
+        // Handle audio playback
+        if (audioRef.current) {
+          audioRef.current.src = response.url;
+          audioRef.current.load();
+        }
+        
+        toast.success("Voice over generated successfully!");
+      } else {
+        toast.error("Failed to generate voice over");
+      }
+    } catch (error) {
+      console.error("Error generating voice over:", error);
+      toast.error("Failed to generate voice over");
+    } finally {
+      setIsGeneratingVoiceOver(false);
+    }
+  };
+
+  // Function to handle voice over button click globally
+  const handleVoiceOverClick = () => {
+    if (generatedArticle) {
+      generateVoiceOver();
+    } else {
+      toast.error("Please generate an article first");
+    }
+  };
+
+  // Function to handle summary button click globally
+  const handleSummaryClick = () => {
+    if (generatedArticle) {
+      summarizeArticle();
+    } else {
+      toast.error("Please generate an article first");
+    }
+  };
+
+  // Add these functions to window object to make them accessible from Navbar
+  useEffect(() => {
+    // @ts-ignore
+    window.handleVoiceOverClick = handleVoiceOverClick;
+    // @ts-ignore
+    window.handleSummaryClick = handleSummaryClick;
+    
+    return () => {
+      // @ts-ignore
+      delete window.handleVoiceOverClick;
+      // @ts-ignore
+      delete window.handleSummaryClick;
+    };
+  }, [generatedArticle, summarizedContent]);
 
   const saveToHistory = useCallback((query: string) => {
     if (!query.trim()) return;
@@ -633,9 +782,10 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
   return (
     <div className="space-y-6">
       <Tabs defaultValue="generate" className="w-full" value={selectedTab} onValueChange={setSelectedTab}>
-        <TabsList className="grid w-full grid-cols-3 mb-6">
+        <TabsList className="grid w-full grid-cols-4 mb-6">
           <TabsTrigger value="generate" className="font-semibold">Generate Article</TabsTrigger>
           <TabsTrigger value="settings" className="font-semibold">Format Settings</TabsTrigger>
+          <TabsTrigger value="summary" disabled={!generatedArticle} className="font-semibold">Summary</TabsTrigger>
           <TabsTrigger value="seo" disabled={!generatedArticle} className="font-semibold">SEO Tools</TabsTrigger>
         </TabsList>
 
@@ -709,236 +859,112 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
           )}
 
           {generatedArticle && (
-            <div className={`grid grid-cols-1 md:grid-cols-3 gap-6 ${transitionClass}`}>
-              <div className="md:col-span-2 space-y-6">
-                <Card className="border shadow-md dark:shadow-none dark:border-gray-800">
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <div>
-                      <CardTitle className="font-display text-2xl">Generated Article</CardTitle>
-                      <CardDescription>
-                        Your Wikipedia-based article is ready
-                      </CardDescription>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <ArticleReviewButton 
-                        variant="outline" 
-                        className="font-medium"
-                      />
-                      <Button variant="outline" onClick={copyToClipboard} className="font-medium">
-                        <Copy className="mr-2 h-4 w-4" />
-                        Copy
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        onClick={() => setSelectedTab("seo")}
-                        className="font-medium"
-                      >
-                        <Sparkles className="mr-2 h-4 w-4" />
-                        SEO
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        onClick={() => setShowVideoGenerator(true)}
-                        className="font-medium text-blue-600 dark:text-blue-400 border-blue-600/30 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                      >
-                        <Video className="mr-2 h-4 w-4" />
-                        Create Video
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  
-                  {readabilityScore !== null && (
-                    <CardContent className="pb-0">
-                      <div className="flex flex-wrap gap-4 justify-between items-center p-3 bg-gray-50 dark:bg-gray-800/50 rounded-md text-sm">
-                        <div>
-                          <span className="font-semibold">Word Count:</span> {wordCount} words
-                        </div>
-                        <div>
-                          <span className="font-semibold">Reading Time:</span> ~{Math.ceil(wordCount / 200)} min
-                        </div>
-                        <div>
-                          <Popover>
-                            <PopoverTrigger>
-                              <div className="flex items-center cursor-pointer text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">
-                                <span className="font-semibold">Readability Score:</span>
-                                <span className={`ml-1 ${getReadabilityColor(readabilityScore)}`}>{readabilityScore}</span>
-                                <span className="ml-1">(i)</span>
-                              </div>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-80">
-                              <div className="space-y-2">
-                                <h4 className="font-medium">Readability Analysis</h4>
-                                <p className="text-sm">
-                                  Score: <span className={getReadabilityColor(readabilityScore)}>{readabilityScore}</span>
-                                  <br />
-                                  Reading Level: {getReadabilityDescription(readabilityScore)}
-                                </p>
-                                <div className="text-xs text-muted-foreground">
-                                  This score is based on the Flesch-Kincaid readability formula.
-                                  Lower scores indicate more complex text.
-                                </div>
-                              </div>
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                      </div>
-                    </CardContent>
-                  )}
-                  
-                  <CardContent className="prose dark:prose-invert max-w-none mt-4">
-                    <ReactMarkdown>{generatedArticle}</ReactMarkdown>
-                  </CardContent>
-                  
-                  <CardFooter className="flex justify-between flex-wrap gap-2">
-                    <div className="flex gap-2">
-                      <Button 
-                        variant="outline" 
-                        onClick={() => saveArticle('draft')}
-                        className="font-medium"
-                      >
-                        <Save className="mr-2 h-4 w-4" />
-                        Save as Draft
-                      </Button>
-                      <Button 
-                        variant="gradient" 
-                        onClick={() => saveArticle('published')}
-                        className="font-medium bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
-                      >
-                        <FileText className="mr-2 h-4 w-4" />
-                        Publish Article
-                      </Button>
-                    </div>
-                    
-                    {articleSaved && (
-                      <Badge variant="outline" className="ml-auto bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400 border-green-200 dark:border-green-800">
-                        {articleId ? "Saved" : "New Draft"}
-                      </Badge>
-                    )}
-                  </CardFooter>
-                </Card>
-              </div>
-              
-              <div className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Images</CardTitle>
-                    <CardDescription>Suggested images for your article</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <Tabs defaultValue="suggested" value={activeImageTab} onValueChange={setActiveImageTab}>
-                      <TabsList className="grid grid-cols-2 w-full">
-                        <TabsTrigger value="suggested">Suggested</TabsTrigger>
-                        <TabsTrigger value="selected" disabled={selectedImages.length === 0}>Selected ({selectedImages.length})</TabsTrigger>
-                      </TabsList>
-                      
-                      <TabsContent value="suggested" className="mt-4">
-                        <div className="grid gap-3">
-                          {suggestedImages.map((image, index) => (
-                            <div key={index} className="relative group">
-                              <img 
-                                src={image} 
-                                alt={generateImageAltText(image, generatedArticle)} 
-                                className={`w-full h-32 object-cover rounded-md transition-all ${
-                                  selectedImages.includes(image) 
-                                    ? "ring-2 ring-primary" 
-                                    : "hover:opacity-90"
-                                }`}
-                              />
-                              <Button 
-                                size="sm" 
-                                variant={selectedImages.includes(image) ? "destructive" : "secondary"}
-                                className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                                onClick={() => toggleImageSelection(image)}
-                              >
-                                {selectedImages.includes(image) ? "Remove" : "Select"}
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      </TabsContent>
-                      
-                      <TabsContent value="selected" className="mt-4">
-                        {selectedImages.length > 0 ? (
-                          <div className="grid gap-3">
-                            {selectedImages.map((image, index) => (
-                              <div key={index} className="relative group">
-                                <img 
-                                  src={image} 
-                                  alt={generateImageAltText(image, generatedArticle)}
-                                  className="w-full h-32 object-cover rounded-md hover:opacity-90 transition-all ring-2 ring-primary"
-                                />
-                                <Button 
-                                  size="sm" 
-                                  variant="destructive"
-                                  className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  onClick={() => toggleImageSelection(image)}
-                                >
-                                  Remove
-                                </Button>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="text-center p-4 text-muted-foreground">
-                            No images selected
-                          </div>
-                        )}
-                      </TabsContent>
-                    </Tabs>
-                  </CardContent>
-                </Card>
+            <div className={`grid grid-cols-1 gap-6 ${transitionClass}`}>
+              <Card className="border shadow-md dark:shadow-none dark:border-gray-800">
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="font-display text-2xl">Generated Article</CardTitle>
+                    <CardDescription>
+                      Your Wikipedia-based article is ready
+                    </CardDescription>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <ArticleReviewButton 
+                      variant="outline" 
+                      className="font-medium"
+                    />
+                    <Button variant="outline" onClick={copyToClipboard} className="font-medium">
+                      <Copy className="mr-2 h-4 w-4" />
+                      Copy
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={summarizeArticle}
+                      className="font-medium"
+                    >
+                      <MessageSquareText className="mr-2 h-4 w-4" />
+                      Summarize
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={generateVoiceOver}
+                      className="font-medium text-green-600 dark:text-green-400 border-green-600/30 hover:bg-green-50 dark:hover:bg-green-900/20"
+                    >
+                      <Headphones className="mr-2 h-4 w-4" />
+                      Voice Over
+                    </Button>
+                  </div>
+                </CardHeader>
                 
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Social Media</CardTitle>
-                    <CardDescription>Ready-to-use social media content</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div>
-                      <Label className="text-sm font-medium mb-2">Captions</Label>
-                      <div className="space-y-2 mt-1">
-                        {captions.map((caption, index) => (
-                          <div key={index} className="relative group">
-                            <div className="p-3 rounded-md bg-muted text-sm">
-                              {caption}
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="absolute top-2 right-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={() => {
-                                navigator.clipboard.writeText(caption);
-                                toast.success("Caption copied to clipboard");
-                              }}
-                            >
-                              <Copy className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        ))}
+                {readabilityScore !== null && (
+                  <CardContent className="pb-0">
+                    <div className="flex flex-wrap gap-4 justify-between items-center p-3 bg-gray-50 dark:bg-gray-800/50 rounded-md text-sm">
+                      <div>
+                        <span className="font-semibold">Word Count:</span> {wordCount} words
                       </div>
-                    </div>
-                    
-                    <div>
-                      <Label className="text-sm font-medium mb-2">Hashtags</Label>
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {hashtags.map((tag, index) => (
-                          <Badge 
-                            key={index} 
-                            variant="secondary"
-                            className="cursor-pointer hover:bg-secondary/80"
-                            onClick={() => {
-                              navigator.clipboard.writeText(tag);
-                              toast.success("Hashtag copied");
-                            }}
-                          >
-                            {tag}
-                          </Badge>
-                        ))}
+                      <div>
+                        <span className="font-semibold">Reading Time:</span> ~{Math.ceil(wordCount / 200)} min
+                      </div>
+                      <div>
+                        <Popover>
+                          <PopoverTrigger>
+                            <div className="flex items-center cursor-pointer text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">
+                              <span className="font-semibold">Readability Score:</span>
+                              <span className={`ml-1 ${getReadabilityColor(readabilityScore)}`}>{readabilityScore}</span>
+                              <span className="ml-1">(i)</span>
+                            </div>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-80">
+                            <div className="space-y-2">
+                              <h4 className="font-medium">Readability Analysis</h4>
+                              <p className="text-sm">
+                                Score: <span className={getReadabilityColor(readabilityScore)}>{readabilityScore}</span>
+                                <br />
+                                Reading Level: {getReadabilityDescription(readabilityScore)}
+                              </p>
+                              <div className="text-xs text-muted-foreground">
+                                This score is based on the Flesch-Kincaid readability formula.
+                                Lower scores indicate more complex text.
+                              </div>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
                       </div>
                     </div>
                   </CardContent>
-                </Card>
-              </div>
+                )}
+                
+                <CardContent className="prose dark:prose-invert max-w-none mt-4">
+                  <ReactMarkdown>{generatedArticle}</ReactMarkdown>
+                </CardContent>
+                
+                <CardFooter className="flex justify-between flex-wrap gap-2">
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => saveArticle('draft')}
+                      className="font-medium"
+                    >
+                      <Save className="mr-2 h-4 w-4" />
+                      Save as Draft
+                    </Button>
+                    <Button 
+                      variant="gradient" 
+                      onClick={() => saveArticle('published')}
+                      className="font-medium bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+                    >
+                      <FileText className="mr-2 h-4 w-4" />
+                      Publish Article
+                    </Button>
+                  </div>
+                  
+                  {articleSaved && (
+                    <Badge variant="outline" className="ml-auto bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400 border-green-200 dark:border-green-800">
+                      {articleId ? "Saved" : "New Draft"}
+                    </Badge>
+                  )}
+                </CardFooter>
+              </Card>
             </div>
           )}
         </TabsContent>
@@ -999,6 +1025,83 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+        
+        {/* Add new Summary tab */}
+        <TabsContent value="summary" className="space-y-6">
+          {isGeneratingSummary ? (
+            <Card>
+              <CardContent className="py-10 flex flex-col items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+                <p className="text-center text-muted-foreground">Generating summary...</p>
+              </CardContent>
+            </Card>
+          ) : summarizedContent ? (
+            <Card className="border shadow-md dark:shadow-none dark:border-gray-800">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="font-display text-2xl">Article Summary</CardTitle>
+                  <CardDescription>
+                    Concise version of your generated article
+                  </CardDescription>
+                </div>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      navigator.clipboard.writeText(summarizedContent);
+                      toast.success("Summary copied to clipboard!");
+                    }}
+                  >
+                    <Copy className="mr-2 h-4 w-4" />
+                    Copy
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    onClick={generateVoiceOver}
+                    className="text-green-600 dark:text-green-400 border-green-600/30 hover:bg-green-50 dark:hover:bg-green-900/20"
+                  >
+                    <Headphones className="mr-2 h-4 w-4" />
+                    Generate Voice Over
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="prose dark:prose-invert max-w-none">
+                <ReactMarkdown>{summarizedContent}</ReactMarkdown>
+              </CardContent>
+              
+              {voiceOverAudio && (
+                <CardFooter className="flex flex-col items-start space-y-4 pt-0">
+                  <Separator className="mb-2" />
+                  <div className="w-full">
+                    <h3 className="text-sm font-medium mb-2">Voice Over</h3>
+                    <audio 
+                      controls 
+                      className="w-full" 
+                      ref={audioRef}
+                      src={voiceOverAudio}
+                    >
+                      Your browser does not support the audio element.
+                    </audio>
+                  </div>
+                </CardFooter>
+              )}
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="py-10 flex flex-col items-center justify-center">
+                <MessageSquareText className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium text-center mb-2">No Summary Available</h3>
+                <p className="text-center text-muted-foreground mb-6">
+                  Generate a summary of your article for quick reference or voice over.
+                </p>
+                <Button onClick={summarizeArticle} disabled={!generatedArticle}>
+                  <MessageSquareText className="mr-2 h-4 w-4" />
+                  Generate Summary
+                </Button>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
         
         <TabsContent value="seo" className="space-y-6">
@@ -1086,6 +1189,101 @@ const ArticleGenerator: React.FC<ArticleGeneratorProps> = () => {
           )}
         </TabsContent>
       </Tabs>
+      
+      {/* Voice Over Dialog */}
+      <Dialog open={showVoiceOver} onOpenChange={setShowVoiceOver}>
+        <DialogContent className="sm:max-w-md">
+          <div className="space-y-4">
+            <h2 className="text-xl font-bold">Voice Over</h2>
+            <p className="text-sm text-muted-foreground">
+              Listen to the AI-generated voice over of your article summary
+            </p>
+            
+            {isGeneratingVoiceOver ? (
+              <div className="flex flex-col items-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+                <p>Generating voice over...</p>
+              </div>
+            ) : voiceOverAudio ? (
+              <div className="w-full">
+                <audio 
+                  controls 
+                  className="w-full" 
+                  autoPlay
+                  ref={audioRef}
+                  src={voiceOverAudio}
+                >
+                  Your browser does not support the audio element.
+                </audio>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p>No audio available. Try generating a voice over.</p>
+              </div>
+            )}
+            
+            <div className="flex justify-end">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowVoiceOver(false)}
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Summary Dialog */}
+      <Dialog open={showSummary} onOpenChange={setShowSummary}>
+        <DialogContent className="sm:max-w-xl">
+          <div className="space-y-4">
+            <h2 className="text-xl font-bold">Article Summary</h2>
+            
+            {isGeneratingSummary ? (
+              <div className="flex flex-col items-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+                <p>Generating summary...</p>
+              </div>
+            ) : summarizedContent ? (
+              <div className="prose dark:prose-invert max-w-none">
+                <ReactMarkdown>{summarizedContent}</ReactMarkdown>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p>No summary available.</p>
+              </div>
+            )}
+            
+            <div className="flex justify-between">
+              <Button 
+                variant="outline" 
+                onClick={generateVoiceOver}
+                disabled={!summarizedContent || isGeneratingVoiceOver}
+              >
+                {isGeneratingVoiceOver ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Headphones className="mr-2 h-4 w-4" />
+                    Generate Voice Over
+                  </>
+                )}
+              </Button>
+              
+              <Button 
+                variant="outline" 
+                onClick={() => setShowSummary(false)}
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
       
       {/* Video Generator Dialog */}
       <Dialog open={showVideoGenerator} onOpenChange={setShowVideoGenerator}>

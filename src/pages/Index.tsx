@@ -4,8 +4,46 @@ import Navbar from "@/components/Navbar";
 import { SidebarNav, sidebarNavItems } from "@/components/SidebarNav";
 import ImprovedAIChatbot from "@/components/ImprovedAIChatbot";
 import { motion } from "framer-motion";
+import { useEffect } from "react";
 
 const Index = () => {
+  // Connect global click handlers for summary and voice over buttons
+  useEffect(() => {
+    // Add event listeners to the navbar buttons
+    const summaryButton = document.querySelector('button:has(.lucide-message-square-text)');
+    const voiceOverButton = document.querySelector('button:has(.lucide-headphones)');
+    
+    if (summaryButton) {
+      summaryButton.addEventListener('click', () => {
+        // @ts-ignore
+        if (window.handleSummaryClick) {
+          // @ts-ignore
+          window.handleSummaryClick();
+        }
+      });
+    }
+    
+    if (voiceOverButton) {
+      voiceOverButton.addEventListener('click', () => {
+        // @ts-ignore
+        if (window.handleVoiceOverClick) {
+          // @ts-ignore
+          window.handleVoiceOverClick();
+        }
+      });
+    }
+    
+    return () => {
+      // Clean up event listeners
+      if (summaryButton) {
+        summaryButton.removeEventListener('click', () => {});
+      }
+      if (voiceOverButton) {
+        voiceOverButton.removeEventListener('click', () => {});
+      }
+    };
+  }, []);
+  
   return (
     <div className="min-h-screen bg-background">
       <Navbar />

@@ -57,9 +57,12 @@ class RunwayAPI {
       mockResponse.url = sampleAudios[textHash % sampleAudios.length];
       
       console.log("Voice over generation completed with URL:", mockResponse.url);
+      toast.success("Voice over generated successfully");
+      
       return mockResponse;
     } catch (error) {
       console.error("RunwayML API error:", error);
+      toast.error("Failed to generate voice over");
       throw error;
     }
   }

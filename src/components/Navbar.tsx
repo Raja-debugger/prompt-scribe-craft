@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Button } from "./ui/button";
 import { ThemeToggle } from "./ThemeToggle";
 import ProfileSection from "./ProfileSection";
-import { FileText, Save, PenSquare } from "lucide-react";
+import { FileText, Save, PenSquare, Headphones, MessageSquareText } from "lucide-react";
 import { NavigationMenu, NavigationMenuContent, NavigationMenuItem, NavigationMenuList, NavigationMenuTrigger } from "./ui/navigation-menu";
 
 const Navbar = () => {
@@ -14,7 +14,7 @@ const Navbar = () => {
           <Link to="/" className="mr-6 flex items-center space-x-2">
             <FileText className="h-6 w-6 text-primary" />
             <span className="hidden font-bold sm:inline-block">
-              ArticleGenerator
+              MindCMS
             </span>
           </Link>
           <NavigationMenu>
@@ -58,6 +58,14 @@ const Navbar = () => {
 
         <div className="flex flex-1 items-center justify-end space-x-2">
           <nav className="flex items-center space-x-2">
+            <Button variant="ghost" size="sm" className="text-blue-600 dark:text-blue-400">
+              <MessageSquareText className="h-4 w-4 mr-2" />
+              Summarize
+            </Button>
+            <Button variant="ghost" size="sm" className="text-green-600 dark:text-green-400">
+              <Headphones className="h-4 w-4 mr-2" />
+              Voice Over
+            </Button>
             <Link to="/saved-articles">
               <Button variant="ghost" size="sm">
                 <Save className="h-4 w-4 mr-2" />
