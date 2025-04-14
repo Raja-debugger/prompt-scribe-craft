@@ -30,7 +30,7 @@ class GeminiAPI {
     try {
       console.log("Starting text summarization with Gemini AI");
       
-      // Get API key but don't prompt the user
+      // Get API key without prompting the user
       const apiKey = this.getApiKey();
       
       // For this demo, we'll simulate the API call
@@ -46,18 +46,18 @@ class GeminiAPI {
       // Improved summarization logic to capture key points
       const text = params.text;
       
-      // Extract more information from the text by identifying key paragraphs
-      // and capturing more sentences from important paragraphs
+      // Extract key information from the text
       const paragraphs = text.split("\n\n");
       
-      // Generate a more comprehensive summary
+      // Generate a comprehensive summary with key points
+      let summary = "";
       let keyPoints: string[] = [];
       
       // Process each paragraph for key information
       paragraphs
         .filter(p => p.trim().length > 0 && !p.startsWith('#'))
         .forEach(p => {
-          // Look for paragraphs with important indicators like numbers, lists, or key phrases
+          // Look for paragraphs with important indicators
           const isImportant = /(\d+%|key|important|significant|main|critical|essential|conclusion)/i.test(p);
           
           const sentences = p.split(/[.!?]+/).filter(s => s.trim().length > 0);
@@ -77,12 +77,16 @@ class GeminiAPI {
       // Ensure we don't have too many points (limit to 10 key points)
       keyPoints = keyPoints.slice(0, 10);
       
-      // Format the summary with bullet points for better readability
-      let summary = "";
-      if (keyPoints.length > 1) {
-        summary = keyPoints.map(point => "• " + point).join("\n\n");
-      } else if (keyPoints.length === 1) {
-        summary = keyPoints[0];
+      // Format the summary with an introduction
+      if (keyPoints.length > 0) {
+        // Extract title from the original text if possible
+        const titleMatch = text.match(/^# \*\*(.*?)\*\*/);
+        const title = titleMatch ? titleMatch[1] : "Article";
+        
+        summary = `Here's a summary of the article on ${title}:\n\n`;
+        
+        // Add key points in a clean format
+        summary += keyPoints.map(point => point).join(" ");
       } else {
         summary = "Unable to generate summary. The content may be too short or in an unsupported format.";
       }
@@ -102,7 +106,7 @@ class GeminiAPI {
     try {
       console.log("Starting chat with Gemini API");
       
-      // Get API key but don't prompt the user
+      // Get API key without prompting the user
       const apiKey = this.getApiKey();
       
       // Simulate API processing time

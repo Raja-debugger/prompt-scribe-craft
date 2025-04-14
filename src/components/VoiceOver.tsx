@@ -2,15 +2,12 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Volume2, Pause, Play, RotateCw, Check, VolumeX, Sparkles } from "lucide-react";
+import { Volume2, Pause, Play, RotateCw, VolumeX, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
-import { runwayAPI } from "@/utils/runwayAPI";
 
 interface VoiceOverProps {
   articleContent: string;
@@ -24,12 +21,11 @@ const VoiceOver: React.FC<VoiceOverProps> = ({
   onClose,
 }) => {
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
-  const [progress, setProgress] = useState<number>(0);
-  const [audioUrl, setAudioUrl] = useState<string>("");
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<string>("generate");
   const [volume, setVolume] = useState<number>(80);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   
   // Function to summarize article content
   const summarizeContent = (content: string, maxLength: number = 500): string => {
@@ -51,59 +47,32 @@ const VoiceOver: React.FC<VoiceOverProps> = ({
     return summary.trim();
   };
 
-  // Function to generate voice over
+  // Generate voice over using Web Speech API
   const generateVoiceOver = async () => {
     setIsGenerating(true);
-    setProgress(0);
-    
-    // Create a summary of the article
-    const summary = summarizeContent(articleContent, 500);
     
     try {
-      // Set up progress simulation
-      const interval = setInterval(() => {
-        setProgress(prev => {
-          if (prev >= 95) {
-            clearInterval(interval);
-            return 95;
-          }
-          return prev + Math.floor(Math.random() * 5);
-        });
-      }, 600);
+      // Create a summary of the article
+      const summary = summarizeContent(articleContent, 500);
       
-      // Generate voice using the Runway API
-      const response = await runwayAPI.generateVoiceOver({
-        text: summary,
-        voice: "default" // You can specify a voice if needed
-      });
+      // Create speech synthesis utterance
+      const utterance = new SpeechSynthesisUtterance(summary);
+      utteranceRef.current = utterance;
       
-      clearInterval(interval);
-      setProgress(100);
+      // Set volume
+      utterance.volume = volume / 100;
       
-      if (response.url) {
-        console.log("Setting audio URL to:", response.url);
-        setAudioUrl(response.url);
-        
-        // Create new audio element
-        const audio = new Audio(response.url);
-        audioRef.current = audio;
-        
-        // Set volume
-        audio.volume = volume / 100;
-        
-        // Add event listeners
-        audio.addEventListener("ended", () => setIsPlaying(false));
-        audio.addEventListener("pause", () => setIsPlaying(false));
-        audio.addEventListener("play", () => setIsPlaying(true));
-        
-        // Preload audio
-        audio.load();
-        
-        toast.success("Voice over generated successfully!");
-        setActiveTab("listen");
-      } else {
-        throw new Error("No audio URL returned from API");
-      }
+      // Set up event handlers
+      utterance.onend = () => setIsPlaying(false);
+      utterance.onpause = () => setIsPlaying(false);
+      utterance.onresume = () => setIsPlaying(true);
+      utterance.onstart = () => setIsPlaying(true);
+      
+      // Store the utterance for later use
+      utteranceRef.current = utterance;
+      
+      toast.success("Voice over generated successfully!");
+      setActiveTab("listen");
     } catch (error) {
       console.error("Error generating voice over:", error);
       toast.error("Failed to generate voice over. Please try again.");
@@ -114,21 +83,21 @@ const VoiceOver: React.FC<VoiceOverProps> = ({
 
   // Handle play/pause
   const togglePlayback = () => {
-    if (!audioRef.current) {
-      console.error("No audio reference available");
+    if (!utteranceRef.current) {
+      console.error("No utterance available");
       return;
     }
     
-    console.log("Toggling playback. Current state:", isPlaying, "Audio source:", audioRef.current.src);
-    
     if (isPlaying) {
-      audioRef.current.pause();
+      window.speechSynthesis.pause();
+      setIsPlaying(false);
     } else {
-      audioRef.current.play()
-        .catch(error => {
-          console.error("Failed to play audio:", error);
-          toast.error("Failed to play audio. Please try again.");
-        });
+      if (speechSynthesis.paused) {
+        window.speechSynthesis.resume();
+      } else {
+        window.speechSynthesis.speak(utteranceRef.current);
+      }
+      setIsPlaying(true);
     }
   };
 
@@ -137,34 +106,24 @@ const VoiceOver: React.FC<VoiceOverProps> = ({
     const newVolume = value[0];
     setVolume(newVolume);
     
-    if (audioRef.current) {
-      audioRef.current.volume = newVolume / 100;
+    if (utteranceRef.current) {
+      utteranceRef.current.volume = newVolume / 100;
     }
   };
 
   // Clean up on component unmount
   useEffect(() => {
     return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.src = "";
+      if (isPlaying) {
+        window.speechSynthesis.cancel();
       }
     };
-  }, []);
+  }, [isPlaying]);
 
   // Auto-generate the voice over when component mounts
   useEffect(() => {
     generateVoiceOver();
   }, []);
-  
-  // Effect to update audio when URL changes
-  useEffect(() => {
-    if (audioUrl && audioRef.current) {
-      console.log("Updating audio element with URL:", audioUrl);
-      audioRef.current.src = audioUrl;
-      audioRef.current.load();
-    }
-  }, [audioUrl]);
 
   // Animation variants for smooth transitions
   const containerVariants = {
@@ -190,206 +149,198 @@ const VoiceOver: React.FC<VoiceOverProps> = ({
   };
 
   return (
-    <Card className="w-full max-w-3xl mx-auto overflow-hidden shadow-lg border-primary/10">
-      <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30">
-        <CardTitle className="flex items-center text-primary">
-          <Volume2 className="mr-2 h-5 w-5" />
-          AI Voice Over
-        </CardTitle>
-        <CardDescription>
-          Listen to an AI-generated voice over summary of your article
-        </CardDescription>
-      </CardHeader>
-      
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="generate">Generate</TabsTrigger>
-          <TabsTrigger value="listen" disabled={!audioUrl}>Listen</TabsTrigger>
-        </TabsList>
-        
-        <AnimatePresence mode="wait">
-          {activeTab === "generate" && (
-            <TabsContent value="generate" key="generate-tab">
-              <motion.div
-                variants={containerVariants}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-                className="space-y-4"
-              >
-                <CardContent className="space-y-4 pt-4">
-                  <motion.div variants={itemVariants} className="space-y-2">
-                    <Alert className="bg-muted border-primary/20">
-                      <Check className="h-4 w-4 text-primary" />
-                      <AlertTitle>Ready to Generate</AlertTitle>
-                      <AlertDescription className="flex justify-between items-center">
-                        <span>Your voice over will summarize the key points from your article</span>
-                      </AlertDescription>
-                    </Alert>
-                  </motion.div>
-                  
-                  <Separator />
-                  
-                  <motion.div variants={itemVariants} className="space-y-2">
-                    <h3 className="font-medium">Content Summary</h3>
-                    <div className="p-3 bg-muted rounded-md text-sm max-h-40 overflow-y-auto">
-                      {summarizeContent(articleContent, 500)}
-                    </div>
-                  </motion.div>
-                  
-                  {isGenerating && (
-                    <motion.div 
-                      variants={itemVariants}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="space-y-2"
-                    >
-                      <div className="flex justify-between items-center">
-                        <h3 className="font-medium">Generation Progress</h3>
-                        <span className="text-sm">{progress}%</span>
-                      </div>
-                      <Progress value={progress} className="h-2" />
-                      <p className="text-xs text-muted-foreground animate-pulse flex items-center">
-                        <RotateCw className="h-3 w-3 mr-2 animate-spin" />
-                        Processing your article content...
-                      </p>
-                    </motion.div>
-                  )}
-                </CardContent>
-                
-                <CardFooter className="flex justify-between">
-                  <Button variant="outline" onClick={onClose}>
-                    Cancel
-                  </Button>
-                  <Button 
-                    onClick={generateVoiceOver} 
-                    disabled={isGenerating}
-                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
-                  >
-                    {isGenerating ? (
-                      <>
-                        <RotateCw className="mr-2 h-4 w-4 animate-spin" />
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="mr-2 h-4 w-4" />
-                        Regenerate Audio
-                      </>
-                    )}
-                  </Button>
-                </CardFooter>
-              </motion.div>
-            </TabsContent>
-          )}
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      transition={{ duration: 0.4 }}
+      className="w-full max-w-2xl"
+    >
+      <Card className="w-full overflow-hidden border-0 shadow-lg bg-gradient-to-r from-purple-600 to-indigo-600 p-1 rounded-xl">
+        <div className="bg-white dark:bg-gray-900 rounded-lg overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-950/30 dark:to-indigo-950/30 pb-3">
+            <CardTitle className="flex items-center text-primary text-lg">
+              <Volume2 className="mr-2 h-4 w-4" />
+              Text-to-Speech Converter
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Listen to an AI-generated voice over of your article
+            </CardDescription>
+          </CardHeader>
           
-          {activeTab === "listen" && (
-            <TabsContent value="listen" key="listen-tab">
-              <motion.div
-                variants={containerVariants}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-                className="space-y-4"
-              >
-                <CardContent className="space-y-6 pt-4">
-                  <motion.div 
-                    variants={itemVariants}
-                    className="p-6 rounded-md bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 flex flex-col items-center"
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="generate" className="text-xs py-1.5">Generate</TabsTrigger>
+              <TabsTrigger value="listen" className="text-xs py-1.5">Listen</TabsTrigger>
+            </TabsList>
+            
+            <AnimatePresence mode="wait">
+              {activeTab === "generate" && (
+                <TabsContent value="generate" key="generate-tab">
+                  <motion.div
+                    variants={containerVariants}
+                    initial="hidden"
+                    animate="visible"
+                    exit="exit"
+                    className="space-y-3"
                   >
-                    <motion.div 
-                      initial={{ scale: 1 }}
-                      animate={{ scale: isPlaying ? [1, 1.05, 1] : 1 }}
-                      transition={{ repeat: isPlaying ? Infinity : 0, duration: 2 }}
-                      className="relative w-16 h-16 mb-4"
-                    >
-                      {isPlaying ? (
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
-                            <Pause 
-                              onClick={togglePlayback} 
-                              className="h-8 w-8 text-primary cursor-pointer hover:text-primary/80 transition-colors"
-                            />
-                          </div>
-                          <div className="absolute inset-0 bg-primary/5 rounded-full animate-ping opacity-75"></div>
+                    <CardContent className="space-y-3 pt-4">
+                      <motion.div variants={itemVariants} className="space-y-2">
+                        <h3 className="text-sm font-medium">Content to Read Aloud</h3>
+                        <div className="p-2 bg-muted rounded-md text-xs max-h-32 overflow-y-auto">
+                          {summarizeContent(articleContent, 500)}
                         </div>
-                      ) : (
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
-                            <Play 
-                              onClick={togglePlayback} 
-                              className="h-8 w-8 text-primary cursor-pointer hover:text-primary/80 transition-colors ml-1"
-                            />
-                          </div>
-                        </div>
+                      </motion.div>
+                      
+                      {isGenerating && (
+                        <motion.div 
+                          variants={itemVariants}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          className="space-y-2"
+                        >
+                          <p className="text-xs text-muted-foreground animate-pulse flex items-center">
+                            <RotateCw className="h-3 w-3 mr-2 animate-spin" />
+                            Processing your article content...
+                          </p>
+                        </motion.div>
                       )}
-                    </motion.div>
+                    </CardContent>
                     
-                    <h3 className="text-lg font-medium mb-2">{articleTitle}</h3>
-                    <p className="text-sm text-muted-foreground text-center max-w-md">
-                      Listen to the AI voice over summary of your article
-                    </p>
-                    
-                    {/* Debugging: Audio element for visibility during testing */}
-                    <audio 
-                      controls 
-                      className="mt-4 w-full max-w-md" 
-                      src={audioUrl}
-                      ref={audioRef}
-                      onPlay={() => setIsPlaying(true)}
-                      onPause={() => setIsPlaying(false)}
-                      onEnded={() => setIsPlaying(false)}
-                    />
-                  </motion.div>
-                  
-                  <motion.div variants={itemVariants} className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center">
-                        {volume === 0 ? (
-                          <VolumeX className="h-4 w-4 mr-2 text-muted-foreground" />
+                    <CardFooter className="flex justify-between pt-2">
+                      <Button variant="outline" size="sm" onClick={onClose} className="text-xs">
+                        Cancel
+                      </Button>
+                      <Button 
+                        onClick={generateVoiceOver} 
+                        disabled={isGenerating}
+                        size="sm"
+                        className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs"
+                      >
+                        {isGenerating ? (
+                          <>
+                            <RotateCw className="mr-1 h-3 w-3 animate-spin" />
+                            Generating...
+                          </>
                         ) : (
-                          <Volume2 className="h-4 w-4 mr-2 text-muted-foreground" />
+                          <>
+                            <Sparkles className="mr-1 h-3 w-3" />
+                            Generate Audio
+                          </>
                         )}
-                        <h3 className="font-medium">Volume</h3>
-                      </div>
-                      <span className="text-sm text-muted-foreground">{volume}%</span>
-                    </div>
-                    <Slider
-                      min={0}
-                      max={100}
-                      step={1}
-                      value={[volume]}
-                      onValueChange={handleVolumeChange}
-                      className="mt-2"
-                    />
+                      </Button>
+                    </CardFooter>
                   </motion.div>
-                </CardContent>
-                
-                <CardFooter className="flex justify-between">
-                  <Button variant="outline" onClick={() => setActiveTab("generate")}>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Regenerate
-                  </Button>
-                  <Button onClick={togglePlayback}>
-                    {isPlaying ? (
-                      <>
-                        <Pause className="mr-2 h-4 w-4" />
-                        Pause
-                      </>
-                    ) : (
-                      <>
-                        <Play className="mr-2 h-4 w-4" />
-                        Play
-                      </>
-                    )}
-                  </Button>
-                </CardFooter>
-              </motion.div>
-            </TabsContent>
-          )}
-        </AnimatePresence>
-      </Tabs>
-    </Card>
+                </TabsContent>
+              )}
+              
+              {activeTab === "listen" && (
+                <TabsContent value="listen" key="listen-tab">
+                  <motion.div
+                    variants={containerVariants}
+                    initial="hidden"
+                    animate="visible"
+                    exit="exit"
+                    className="space-y-3"
+                  >
+                    <CardContent className="space-y-4 pt-4">
+                      <motion.div 
+                        variants={itemVariants}
+                        className="p-4 rounded-md bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-950/30 dark:to-indigo-950/30 flex flex-col items-center"
+                      >
+                        <motion.div 
+                          initial={{ scale: 1 }}
+                          animate={{ scale: isPlaying ? [1, 1.05, 1] : 1 }}
+                          transition={{ repeat: isPlaying ? Infinity : 0, duration: 2 }}
+                          className="relative w-14 h-14 mb-3"
+                        >
+                          {isPlaying ? (
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center">
+                                <Pause 
+                                  onClick={togglePlayback} 
+                                  className="h-6 w-6 text-primary cursor-pointer hover:text-primary/80 transition-colors"
+                                />
+                              </div>
+                              <div className="absolute inset-0 bg-primary/5 rounded-full animate-ping opacity-75"></div>
+                            </div>
+                          ) : (
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center">
+                                <Play 
+                                  onClick={togglePlayback} 
+                                  className="h-6 w-6 text-primary cursor-pointer hover:text-primary/80 transition-colors ml-1"
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </motion.div>
+                        
+                        <h3 className="text-sm font-medium mb-1">{articleTitle}</h3>
+                        <p className="text-xs text-muted-foreground text-center max-w-md">
+                          Click play to listen to the voice over
+                        </p>
+                      </motion.div>
+                      
+                      <motion.div variants={itemVariants} className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center">
+                            {volume === 0 ? (
+                              <VolumeX className="h-3 w-3 mr-1 text-muted-foreground" />
+                            ) : (
+                              <Volume2 className="h-3 w-3 mr-1 text-muted-foreground" />
+                            )}
+                            <h3 className="text-xs font-medium">Volume</h3>
+                          </div>
+                          <span className="text-xs text-muted-foreground">{volume}%</span>
+                        </div>
+                        <Slider
+                          min={0}
+                          max={100}
+                          step={1}
+                          value={[volume]}
+                          onValueChange={handleVolumeChange}
+                          className="mt-1"
+                        />
+                      </motion.div>
+                    </CardContent>
+                    
+                    <CardFooter className="flex justify-between pt-0">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setActiveTab("generate")}
+                        className="text-xs"
+                      >
+                        <Sparkles className="mr-1 h-3 w-3" />
+                        Regenerate
+                      </Button>
+                      <Button 
+                        onClick={togglePlayback}
+                        size="sm"
+                        className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs"
+                      >
+                        {isPlaying ? (
+                          <>
+                            <Pause className="mr-1 h-3 w-3" />
+                            Pause
+                          </>
+                        ) : (
+                          <>
+                            <Play className="mr-1 h-3 w-3" />
+                            Speak
+                          </>
+                        )}
+                      </Button>
+                    </CardFooter>
+                  </motion.div>
+                </TabsContent>
+              )}
+            </AnimatePresence>
+          </Tabs>
+        </div>
+      </Card>
+    </motion.div>
   );
 };
 
