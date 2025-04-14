@@ -46,20 +46,23 @@ class GeminiAPI {
       // For now, we'll create a simple summarization logic
       const text = params.text;
       
-      // Simple summarization: extract first sentence from each paragraph
+      // Create a concise summary - extract only first sentence from each paragraph
+      // and limit to 8 lines maximum
       const paragraphs = text.split("\n\n");
       const firstSentences = paragraphs
-        .filter(p => p.trim().length > 0)
+        .filter(p => p.trim().length > 0 && !p.startsWith('#'))
         .map(p => {
           const sentences = p.split(/[.!?]+/);
           return sentences[0] ? sentences[0] + "." : "";
         })
         .filter(s => s.length > 0);
       
-      // Join the sentences and limit to a reasonable length
-      let summary = firstSentences.join(" ");
-      if (summary.length > 800) {
-        summary = summary.substring(0, 800) + "...";
+      // Limit to 8 sentences max
+      let summary = firstSentences.slice(0, 8).join(" ");
+      
+      // Make sure it's not too long overall
+      if (summary.length > 600) {
+        summary = summary.substring(0, 600) + "...";
       }
       
       console.log("Text summarization completed successfully");

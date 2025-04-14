@@ -1,179 +1,121 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Separator } from "@/components/ui/separator";
-import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, ClipboardCopy, Sparkles, Headphones } from "lucide-react";
-import { motion } from "framer-motion";
+import { Label } from "@/components/ui/label";
+import { Loader2, X, Copy, Headphones } from "lucide-react";
 import { toast } from "sonner";
 import { geminiAPI } from "@/utils/geminiAPI";
-import { runwayAPI } from "@/utils/runwayAPI";
 
 interface TextSummarizerProps {
   articleContent: string;
   articleTitle: string;
   onClose: () => void;
-  onVoiceOver: (summary: string) => void;
+  onVoiceOver?: (summary: string) => void;
 }
 
 const TextSummarizer: React.FC<TextSummarizerProps> = ({
   articleContent,
   articleTitle,
   onClose,
-  onVoiceOver
+  onVoiceOver,
 }) => {
-  const [summarizedText, setSummarizedText] = useState<string>("");
-  const [isSummarizing, setIsSummarizing] = useState<boolean>(false);
-  const [progress, setProgress] = useState<number>(0);
+  const [summary, setSummary] = useState<string>("");
+  const [isGenerating, setIsGenerating] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (articleContent) {
+      generateSummary();
+    }
+  }, [articleContent]);
 
   const generateSummary = async () => {
-    setIsSummarizing(true);
-    setProgress(0);
-    
-    // Set up progress simulation
-    const interval = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 95) {
-          clearInterval(interval);
-          return 95;
-        }
-        return prev + Math.floor(Math.random() * 5);
-      });
-    }, 300);
-    
+    setIsGenerating(true);
     try {
-      const summary = await geminiAPI.summarizeText({ text: articleContent });
-      setSummarizedText(summary);
+      // Clean the article content by removing markdown formatting and other noise
+      const cleanContent = articleContent
+        .replace(/^# \*\*.*?\*\*\n\n/, '')  // Remove title
+        .replace(/##\s+\*\*.*?\*\*\n\n/g, '') // Remove section headers
+        .replace(/\*\*/g, '')   // Remove bold markers
+        .replace(/\n\n---\n\*Source.*/, ''); // Remove source attribution
       
-      clearInterval(interval);
-      setProgress(100);
+      // Use the Gemini API to summarize the article
+      const summaryText = await geminiAPI.summarizeText({ text: cleanContent });
       
-      // Store the summary in localStorage to persist between pages
-      localStorage.setItem("summarized_text", summary);
+      // Store the summarized text and title in localStorage for later use
+      localStorage.setItem("summarized_text", summaryText);
       localStorage.setItem("summarized_title", articleTitle);
+      
+      setSummary(summaryText);
     } catch (error) {
       console.error("Error generating summary:", error);
-      toast.error("Failed to generate summary. Please try again.");
+      toast.error("Failed to generate summary");
     } finally {
-      setIsSummarizing(false);
+      setIsGenerating(false);
     }
   };
 
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(summarizedText);
+    navigator.clipboard.writeText(summary);
     toast.success("Summary copied to clipboard");
   };
 
   const handleVoiceOver = () => {
-    onVoiceOver(summarizedText);
-  };
-
-  // Run summarization when component mounts
-  React.useEffect(() => {
-    generateSummary();
-    // Store the current article in case we need it later
-    localStorage.setItem("original_article", articleContent);
-  }, []);
-
-  // Animation variants
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: { 
-      opacity: 1,
-      transition: { 
-        duration: 0.5,
-        when: "beforeChildren",
-        staggerChildren: 0.1
-      }
+    if (onVoiceOver && summary) {
+      onVoiceOver(summary);
     }
   };
 
-  const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: { y: 0, opacity: 1 }
-  };
-
   return (
-    <Card className="w-full max-w-3xl mx-auto shadow-lg border-primary/10">
-      <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30">
-        <CardTitle className="flex items-center text-primary">
-          <Sparkles className="mr-2 h-5 w-5" />
-          AI Article Summary
-        </CardTitle>
-        <CardDescription>
-          AI-generated summary of your article
-        </CardDescription>
+    <Card className="w-full max-w-2xl bg-white dark:bg-gray-900 shadow-xl">
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <div>
+          <CardTitle className="text-xl text-primary">Article Summary</CardTitle>
+        </div>
+        <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
+          <X className="h-4 w-4" />
+        </Button>
       </CardHeader>
       
-      <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-      >
-        <CardContent className="space-y-4 pt-4">
-          {isSummarizing ? (
-            <motion.div variants={itemVariants} className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="font-medium">Summarizing Article</h3>
-                <span className="text-sm">{progress}%</span>
-              </div>
-              <Progress value={progress} className="h-2" />
-              <p className="text-sm text-muted-foreground animate-pulse flex items-center">
-                <Sparkles className="h-4 w-4 mr-2 animate-pulse" />
-                Our AI is extracting the key points from your article...
-              </p>
-            </motion.div>
-          ) : (
-            <>
-              <motion.div variants={itemVariants}>
-                <Alert className="bg-muted border-primary/20">
-                  <Check className="h-4 w-4 text-primary" />
-                  <AlertDescription className="flex justify-between items-center">
-                    <span>Summary generated successfully</span>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="ml-2" 
-                      onClick={copyToClipboard}
-                    >
-                      <ClipboardCopy className="h-3 w-3 mr-1" />
-                      Copy
-                    </Button>
-                  </AlertDescription>
-                </Alert>
-              </motion.div>
-              
-              <Separator />
-              
-              <motion.div variants={itemVariants} className="space-y-2">
-                <h3 className="font-medium">Article Summary</h3>
-                <Textarea 
-                  className="min-h-[200px] text-sm focus-visible:ring-1"
-                  value={summarizedText}
-                  onChange={(e) => setSummarizedText(e.target.value)}
-                />
-              </motion.div>
-            </>
-          )}
-        </CardContent>
-        
-        <CardFooter className="flex justify-between">
-          <Button variant="outline" onClick={onClose}>
-            Close
-          </Button>
+      <CardContent className="pt-2 pb-0">
+        {isGenerating ? (
+          <div className="flex flex-col items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+            <p className="text-muted-foreground text-center">Generating summary with Gemini AI...</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <p className="text-sm font-medium text-muted-foreground mb-2">
+              Here's a concise summary of "{articleTitle}":
+            </p>
+            <div className="relative">
+              <Textarea 
+                value={summary} 
+                readOnly 
+                className="h-[180px] resize-none text-foreground"
+              />
+            </div>
+          </div>
+        )}
+      </CardContent>
+      
+      <CardFooter className="flex justify-end gap-2 pt-4">
+        <Button variant="outline" onClick={copyToClipboard} disabled={isGenerating || !summary}>
+          <Copy className="mr-2 h-4 w-4" />
+          Copy
+        </Button>
+        {onVoiceOver && (
           <Button 
-            onClick={handleVoiceOver}
-            disabled={!summarizedText || isSummarizing}
-            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+            onClick={handleVoiceOver} 
+            disabled={isGenerating || !summary}
+            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
           >
             <Headphones className="mr-2 h-4 w-4" />
-            Generate Voice Over
+            Voice Over
           </Button>
-        </CardFooter>
-      </motion.div>
+        )}
+      </CardFooter>
     </Card>
   );
 };
