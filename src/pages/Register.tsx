@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -30,11 +30,12 @@ const Register = () => {
   const { register: registerUser, isAuthenticated } = useAuth();
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  // If already authenticated, redirect to home page
-  if (isAuthenticated) {
-    navigate('/');
-    return null;
-  }
+  // Move the conditional navigation to useEffect instead of early return
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/');
+    }
+  }, [isAuthenticated, navigate]);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),

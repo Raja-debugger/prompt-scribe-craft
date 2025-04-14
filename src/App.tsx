@@ -15,11 +15,16 @@ import { AnimatePresence, motion } from "framer-motion";
 
 const queryClient = new QueryClient();
 
-// Protected route component - fixed conditional hook usage
+// Fix the ProtectedRoute component to avoid early returns
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated } = useAuth();
   
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
+  // Return a valid JSX element in both cases rather than using an early return
+  return (
+    <>
+      {isAuthenticated ? children : <Navigate to="/login" replace />}
+    </>
+  );
 };
 
 // Add page transitions
@@ -41,52 +46,47 @@ const PageTransition = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-const AppRoutes = () => {
-  const location = useLocation();
-  
-  return (
-    <PageTransition>
-      <Routes location={location}>
-        <Route path="/register" element={<Register />} />
-        <Route path="/login" element={<Login />} />
-        <Route 
-          path="/" 
-          element={
-            <ProtectedRoute>
-              <Index />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/saved-articles" 
-          element={
-            <ProtectedRoute>
-              <SavedArticles />
-            </ProtectedRoute>
-          } 
-        />
-        {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </PageTransition>
-  );
-};
-
+// Move AppRoutes inside the AuthProvider to ensure useAuth works properly
 const App = () => {
   return (
     <ThemeProvider defaultTheme="light">
       <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
+        <BrowserRouter>
+          <AuthProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
               <div className="min-h-screen bg-background transition-colors duration-300">
-                <AppRoutes />
+                <Routes>
+                  <Route path="/register" element={<Register />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route 
+                    path="/" 
+                    element={
+                      <ProtectedRoute>
+                        <PageTransition>
+                          <Index />
+                        </PageTransition>
+                      </ProtectedRoute>
+                    } 
+                  />
+                  <Route 
+                    path="/saved-articles" 
+                    element={
+                      <ProtectedRoute>
+                        <PageTransition>
+                          <SavedArticles />
+                        </PageTransition>
+                      </ProtectedRoute>
+                    } 
+                  />
+                  {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
               </div>
-            </BrowserRouter>
-          </TooltipProvider>
-        </AuthProvider>
+            </TooltipProvider>
+          </AuthProvider>
+        </BrowserRouter>
       </QueryClientProvider>
     </ThemeProvider>
   );
