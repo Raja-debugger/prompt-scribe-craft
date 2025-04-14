@@ -67,6 +67,7 @@ const Navbar = () => {
                 My Articles
               </Button>
             </Link>
+            <ThemeToggle />
             {isAuthenticated ? (
               <ProfileSection size="compact" className="shadow-none scale-90" />
             ) : (
@@ -81,7 +82,6 @@ const Navbar = () => {
                 </Link>
               </>
             )}
-            <ThemeToggle />
           </nav>
         </div>
       </div>

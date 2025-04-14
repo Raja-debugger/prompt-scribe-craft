@@ -37,7 +37,7 @@ const PageTransition = ({ children }: { children: React.ReactNode }) => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -20 }}
-        transition={{ duration: 0.3 }}
+        transition={{ duration: 0.4, ease: "easeInOut" }}
       >
         {children}
       </motion.div>
@@ -85,7 +85,9 @@ const App = () => {
             <Toaster />
             <Sonner />
             <BrowserRouter>
-              <AppRoutes />
+              <div className="min-h-screen bg-background transition-colors duration-300">
+                <AppRoutes />
+              </div>
             </BrowserRouter>
           </TooltipProvider>
         </AuthProvider>

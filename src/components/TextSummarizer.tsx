@@ -3,7 +3,6 @@ import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { Loader2, X, Copy, Headphones } from "lucide-react";
 import { toast } from "sonner";
 import { geminiAPI } from "@/utils/geminiAPI";
@@ -86,14 +85,14 @@ const TextSummarizer: React.FC<TextSummarizerProps> = ({
           </div>
         ) : (
           <div className="space-y-4">
-            <p className="text-sm font-medium text-muted-foreground mb-2">
-              Here's a concise summary of "{articleTitle}":
+            <p className="text-sm text-muted-foreground mb-2">
+              Summary of "{articleTitle}":
             </p>
             <div className="relative">
               <Textarea 
                 value={summary} 
                 readOnly 
-                className="h-[180px] resize-none text-foreground"
+                className="h-[180px] resize-none text-foreground text-base font-normal leading-relaxed"
               />
             </div>
           </div>

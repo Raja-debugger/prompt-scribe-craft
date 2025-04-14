@@ -14,9 +14,10 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { MessageSquare, Send, Bot, X, HelpCircle, Sparkles, User } from "lucide-react";
+import { MessageSquare, Send, Bot, X, Sparkles, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { geminiAPI } from "@/utils/geminiAPI";
 
 interface Message {
   id: string;
@@ -36,77 +37,14 @@ const ImprovedAIChatbot: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
-
-  // System prompt for MindCMS specific assistant
-  const systemPrompt = `You are an AI assistant for MindCMS, an AI-powered content management system designed to streamline content creation, SEO optimization, publication, and social media management. 
-  
-Features include:
-- Content generation from topics
-- SEO optimization with meta tags, readability scores, keyword suggestions
-- Image optimization with ALT tags and compression
-- Voice over generation
-- Social media post creation and scheduling
-- Analytics and performance tracking
-
-Help users understand how to use MindCMS, provide tips on content creation, SEO, and marketing strategies. Be detailed, professional and helpful.`;
+  const [chatHistory, setChatHistory] = useState<Array<{role: string, content: string}>>([]);
 
   // Welcome message
   const welcomeMessage: Message = {
     id: "welcome",
     role: "assistant",
-    content: "👋 Hello! I'm your MindCMS AI assistant. I can help you with content creation, SEO optimization, publishing workflows, and more. Ask me anything about MindCMS!",
+    content: "👋 Hello! I'm your Gemini AI assistant. I can help you with content creation, research, questions, and more. What would you like to know?",
     timestamp: new Date()
-  };
-
-  // Sample responses for quick replies
-  const sampleResponses = {
-    contentCreation: `MindCMS uses advanced AI models to generate comprehensive articles from just a topic. Here's how it works:
-
-1. Input your topic and optional category in the main editor
-2. Our AI analyzes the topic and generates:
-   - Complete article (1000+ words)
-   - Properly formatted headers and subheaders
-   - SEO-optimized titles and keywords
-   - Meta descriptions
-   
-The AI can also generate voice overs to accompany your content!`,
-
-    seoOptimization: `MindCMS automates SEO optimization with these features:
-
-1. Keyword research and suggestions
-2. Meta tag generation (title, description, keywords)
-3. Readability score analysis
-4. Keyword density optimization
-5. Image optimization with ALT tags
-6. Mobile-friendly content formatting
-7. Internal linking suggestions
-
-All SEO elements can be reviewed and adjusted before publishing.`,
-
-    analytics: `MindCMS provides comprehensive analytics to track content performance:
-
-1. Page views, bounce rates, and time on page
-2. Keyword ranking tracking
-3. Backlink analysis
-4. Social media engagement metrics
-5. Conversion tracking
-6. Content heatmaps
-7. A/B testing results
-
-You can view custom reports and export data for further analysis.`,
-
-    workflow: `MindCMS streamlines your content workflow:
-
-1. Content ideation with AI topic suggestions
-2. One-click content generation
-3. Built-in editing tools
-4. Automated SEO optimization
-5. Content scheduling
-6. Multi-platform publishing
-7. Social media integration
-8. Performance tracking
-
-This end-to-end system reduces content production time by up to 80%.`
   };
 
   // Set initial welcome message
@@ -171,37 +109,15 @@ This end-to-end system reduces content production time by up to 80%.`
     setInputValue("");
     setIsLoading(true);
 
+    // Update chat history
+    const updatedHistory = [
+      ...chatHistory,
+      { role: "user", content: inputValue }
+    ];
+    setChatHistory(updatedHistory);
+
     try {
-      // Mock AI response - in a real implementation, this would call your backend API
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Generate a response based on the user's input
-      let responseContent = "";
-      const userQuery = inputValue.toLowerCase();
-      
-      if (userQuery.includes("content") && (userQuery.includes("create") || userQuery.includes("generation") || userQuery.includes("write"))) {
-        responseContent = sampleResponses.contentCreation;
-      } else if (userQuery.includes("seo") || userQuery.includes("optimization") || userQuery.includes("search engine")) {
-        responseContent = sampleResponses.seoOptimization;
-      } else if (userQuery.includes("analytics") || userQuery.includes("stats") || userQuery.includes("performance") || userQuery.includes("tracking")) {
-        responseContent = sampleResponses.analytics;
-      } else if (userQuery.includes("workflow") || userQuery.includes("process") || userQuery.includes("publish")) {
-        responseContent = sampleResponses.workflow;
-      } else {
-        // Generate a generic response
-        responseContent = `Thank you for your question about "${inputValue.trim()}". 
-
-MindCMS can help you with this by leveraging our advanced AI content tools that simplify content creation, optimization, and distribution. You can:
-
-1. Use the main editor to generate content related to your topic
-2. Review and edit the AI-generated content to match your style
-3. Let our system optimize it for SEO automatically
-4. Add AI-generated voice overs for multimedia content
-5. Schedule it for publication across your channels
-
-Would you like me to explain any specific aspect of MindCMS in more detail?`;
-      }
-
+      // Add placeholder message for the assistant
       const assistantMessage: Message = {
         id: `assistant-${Date.now()}`,
         role: "assistant",
@@ -210,7 +126,20 @@ Would you like me to explain any specific aspect of MindCMS in more detail?`;
       };
 
       setMessages(prev => [...prev, assistantMessage]);
-      setFullResponse(responseContent);
+      
+      // Call the Gemini API
+      const response = await geminiAPI.chatWithGemini({ 
+        message: inputValue,
+        history: updatedHistory
+      });
+      
+      // Update chat history with assistant's response
+      setChatHistory([
+        ...updatedHistory,
+        { role: "assistant", content: response }
+      ]);
+      
+      setFullResponse(response);
       setIsTyping(true);
       
     } catch (error) {
@@ -264,8 +193,8 @@ Would you like me to explain any specific aspect of MindCMS in more detail?`;
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <SheetTitle className="text-left">MindCMS Assistant</SheetTitle>
-                  <SheetDescription className="text-left text-xs">Powered by AI</SheetDescription>
+                  <SheetTitle className="text-left">Gemini AI</SheetTitle>
+                  <SheetDescription className="text-left text-xs">Ask me anything</SheetDescription>
                 </div>
               </div>
               <SheetClose asChild>
@@ -348,7 +277,7 @@ Would you like me to explain any specific aspect of MindCMS in more detail?`;
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Ask anything about MindCMS..."
+                placeholder="Ask Gemini AI anything..."
                 className="min-h-12 resize-none"
                 disabled={isLoading}
               />
@@ -357,8 +286,8 @@ Would you like me to explain any specific aspect of MindCMS in more detail?`;
                 disabled={!inputValue.trim() || isLoading}
                 size="icon"
                 className={cn(
-                  "shrink-0 transition-all",
-                  !inputValue.trim() ? "opacity-60" : "bg-primary"
+                  "shrink-0 transition-all bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700",
+                  !inputValue.trim() ? "opacity-60" : ""
                 )}
               >
                 {isLoading ? (
@@ -371,22 +300,22 @@ Would you like me to explain any specific aspect of MindCMS in more detail?`;
             <div className="mt-2">
               <div className="flex gap-2 text-xs justify-center text-muted-foreground">
                 <Button variant="ghost" size="sm" className="h-auto py-1 px-2 text-xs" onClick={() => {
-                  setInputValue("How does content creation work in MindCMS?");
+                  setInputValue("What can you help me with?");
                   setTimeout(() => inputRef.current?.focus(), 10);
                 }}>
-                  Content Creation
+                  Capabilities
                 </Button>
                 <Button variant="ghost" size="sm" className="h-auto py-1 px-2 text-xs" onClick={() => {
-                  setInputValue("Tell me about SEO optimization features");
+                  setInputValue("Give me content ideas for my blog");
                   setTimeout(() => inputRef.current?.focus(), 10);
                 }}>
-                  SEO Features
+                  Content Ideas
                 </Button>
                 <Button variant="ghost" size="sm" className="h-auto py-1 px-2 text-xs" onClick={() => {
-                  setInputValue("What analytics does MindCMS provide?");
+                  setInputValue("How can I improve my article's SEO?");
                   setTimeout(() => inputRef.current?.focus(), 10);
                 }}>
-                  Analytics
+                  SEO Tips
                 </Button>
               </div>
             </div>
