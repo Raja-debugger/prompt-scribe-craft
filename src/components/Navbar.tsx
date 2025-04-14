@@ -8,6 +8,7 @@ import { NavigationMenu, NavigationMenuContent, NavigationMenuItem, NavigationMe
 import { useAuth } from "@/context/AuthContext";
 
 const Navbar = () => {
+  // Always call hooks at the top level, regardless of conditions
   const { isAuthenticated } = useAuth();
 
   return (

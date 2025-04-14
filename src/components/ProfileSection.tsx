@@ -31,6 +31,7 @@ interface ProfileSectionProps {
 }
 
 const ProfileSection: React.FC<ProfileSectionProps> = ({ className, size = "default" }) => {
+  // All hooks called at the top level
   const { logout } = useAuth();
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
@@ -62,8 +63,10 @@ const ProfileSection: React.FC<ProfileSectionProps> = ({ className, size = "defa
     toast.success("Logged out successfully");
   };
 
+  // Render different layouts based on size prop without early returns
+  // Always return one JSX tree at the end
   const isCompact = size === "compact";
-
+  
   if (isCompact) {
     return (
       <DropdownMenu>

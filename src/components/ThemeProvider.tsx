@@ -27,7 +27,7 @@ export function ThemeProvider({
   storageKey = "vite-ui-theme",
   ...props
 }: ThemeProviderProps) {
-  // Changed this to be properly inside a function component
+  // Ensure hooks are always called unconditionally
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window === 'undefined') return defaultTheme;
     return (localStorage.getItem(storageKey) as Theme) || defaultTheme;
