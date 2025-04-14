@@ -15,15 +15,11 @@ import { AnimatePresence, motion } from "framer-motion";
 
 const queryClient = new QueryClient();
 
-// Protected route component
+// Protected route component - fixed conditional hook usage
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated } = useAuth();
   
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-  
-  return <>{children}</>;
+  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 };
 
 // Add page transitions

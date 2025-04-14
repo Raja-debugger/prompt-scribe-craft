@@ -1,6 +1,5 @@
 
 import { useState, useEffect } from "react";
-import { Navigate } from "react-router-dom";
 import ArticleGenerator from "@/components/ArticleGenerator";
 import Navbar from "@/components/Navbar";
 import { SidebarNav, sidebarNavItems } from "@/components/SidebarNav";
@@ -9,13 +8,22 @@ import TextSummarizer from "@/components/TextSummarizer";
 import VoiceOver from "@/components/VoiceOver";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 const Index = () => {
   const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
   const [showSummarizer, setShowSummarizer] = useState<boolean>(false);
   const [showVoiceOver, setShowVoiceOver] = useState<boolean>(false);
   const [articleContent, setArticleContent] = useState<string>("");
   const [articleTitle, setArticleTitle] = useState<string>("Your Article");
+
+  // Check authentication in useEffect, not during render
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate("/login");
+    }
+  }, [isAuthenticated, navigate]);
 
   // Connect global click handlers for summary and voice over buttons
   useEffect(() => {
@@ -96,11 +104,6 @@ const Index = () => {
       delete window.handleVoiceOverClick;
     };
   }, []);
-
-  // Redirect to login if not authenticated
-  if (!isAuthenticated) {
-    return <Navigate to="/login" />;
-  }
   
   const handleVoiceOverFromSummary = (summary: string) => {
     setArticleContent(summary);
@@ -108,6 +111,7 @@ const Index = () => {
     setShowVoiceOver(true);
   };
 
+  // Removed early return that was causing hook error
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
