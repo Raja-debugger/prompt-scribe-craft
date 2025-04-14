@@ -127,11 +127,18 @@ const ImprovedAIChatbot: React.FC = () => {
 
       setMessages(prev => [...prev, assistantMessage]);
       
-      // Call the Gemini API
-      const response = await geminiAPI.chatWithGemini({ 
-        message: inputValue,
-        history: updatedHistory
-      });
+      // Call the Gemini API with error handling
+      let response;
+      try {
+        response = await geminiAPI.chatWithGemini({ 
+          message: inputValue,
+          history: updatedHistory
+        });
+      } catch (error) {
+        // If the API call fails, provide a fallback response
+        console.error("Failed to get response from Gemini API:", error);
+        response = "I'm having trouble connecting to my knowledge base right now. Please try again in a moment or ask me something else.";
+      }
       
       // Update chat history with assistant's response
       setChatHistory([
@@ -149,6 +156,17 @@ const ImprovedAIChatbot: React.FC = () => {
         description: "Failed to send message. Please try again.",
         variant: "destructive"
       });
+      
+      // Add error message to the chat
+      setMessages(prev => [
+        ...prev, 
+        {
+          id: `error-${Date.now()}`,
+          role: "assistant",
+          content: "Sorry, I encountered an error while processing your message. Please try again.",
+          timestamp: new Date()
+        }
+      ]);
     } finally {
       setIsLoading(false);
     }

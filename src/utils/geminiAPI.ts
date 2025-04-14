@@ -11,7 +11,8 @@ interface ChatParams {
 }
 
 class GeminiAPI {
-  private apiKey: string | null = null;
+  // Using a default API key for demo purposes
+  private apiKey: string | null = "demo-api-key-for-testing-purposes-only";
 
   setApiKey(key: string) {
     this.apiKey = key;
@@ -20,23 +21,17 @@ class GeminiAPI {
 
   getApiKey(): string | null {
     if (!this.apiKey) {
-      this.apiKey = localStorage.getItem("gemini_api_key");
+      this.apiKey = localStorage.getItem("gemini_api_key") || "demo-api-key-for-testing-purposes-only";
     }
     return this.apiKey;
   }
 
   async summarizeText(params: SummarizeParams): Promise<string> {
     try {
-      console.log("Starting text summarization with Gemini API");
+      console.log("Starting text summarization with Gemini AI");
       
+      // Get API key but don't prompt the user
       const apiKey = this.getApiKey();
-      if (!apiKey) {
-        const promptedKey = prompt("Please enter your Gemini API key to use the summarization feature:");
-        if (!promptedKey) {
-          throw new Error("API key is required for summarization");
-        }
-        this.setApiKey(promptedKey);
-      }
       
       // For this demo, we'll simulate the API call
       toast.info("Summarizing your article", {
@@ -48,26 +43,48 @@ class GeminiAPI {
       await new Promise(resolve => setTimeout(resolve, 2000));
 
       // This is where you would make the actual Gemini API call
-      // For now, we'll create a simple summarization logic
+      // Improved summarization logic to capture key points
       const text = params.text;
       
-      // Create a concise summary - extract only first sentence from each paragraph
-      // and limit to 8 lines maximum
+      // Extract more information from the text by identifying key paragraphs
+      // and capturing more sentences from important paragraphs
       const paragraphs = text.split("\n\n");
-      const firstSentences = paragraphs
+      
+      // Generate a more comprehensive summary
+      let keyPoints: string[] = [];
+      
+      // Process each paragraph for key information
+      paragraphs
         .filter(p => p.trim().length > 0 && !p.startsWith('#'))
-        .map(p => {
-          const sentences = p.split(/[.!?]+/);
-          return sentences[0] ? sentences[0] + "." : "";
-        })
-        .filter(s => s.length > 0);
+        .forEach(p => {
+          // Look for paragraphs with important indicators like numbers, lists, or key phrases
+          const isImportant = /(\d+%|key|important|significant|main|critical|essential|conclusion)/i.test(p);
+          
+          const sentences = p.split(/[.!?]+/).filter(s => s.trim().length > 0);
+          
+          if (isImportant && sentences.length > 0) {
+            // For important paragraphs, take more sentences
+            const sentencesToTake = Math.min(sentences.length, 3);
+            for (let i = 0; i < sentencesToTake; i++) {
+              keyPoints.push(sentences[i] + ".");
+            }
+          } else if (sentences.length > 0) {
+            // For regular paragraphs, take the first sentence
+            keyPoints.push(sentences[0] + ".");
+          }
+        });
       
-      // Limit to 8 sentences max
-      let summary = firstSentences.slice(0, 8).join(" ");
+      // Ensure we don't have too many points (limit to 10 key points)
+      keyPoints = keyPoints.slice(0, 10);
       
-      // Make sure it's not too long overall
-      if (summary.length > 600) {
-        summary = summary.substring(0, 600) + "...";
+      // Format the summary with bullet points for better readability
+      let summary = "";
+      if (keyPoints.length > 1) {
+        summary = keyPoints.map(point => "• " + point).join("\n\n");
+      } else if (keyPoints.length === 1) {
+        summary = keyPoints[0];
+      } else {
+        summary = "Unable to generate summary. The content may be too short or in an unsupported format.";
       }
       
       console.log("Text summarization completed successfully");
@@ -85,16 +102,9 @@ class GeminiAPI {
     try {
       console.log("Starting chat with Gemini API");
       
+      // Get API key but don't prompt the user
       const apiKey = this.getApiKey();
-      if (!apiKey) {
-        const promptedKey = prompt("Please enter your Gemini API key to use the chat feature:");
-        if (!promptedKey) {
-          throw new Error("API key is required for chat");
-        }
-        this.setApiKey(promptedKey);
-      }
       
-      // For this demo, we'll simulate the API call
       // Simulate API processing time
       await new Promise(resolve => setTimeout(resolve, 1000));
 
