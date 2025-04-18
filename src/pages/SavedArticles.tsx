@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, Trash2, Edit, Eye } from "lucide-react";
+import { FileText, Trash2, Edit, Eye, Instagram, Linkedin, Share } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -29,7 +28,6 @@ const SavedArticles = () => {
   const [activeTab, setActiveTab] = useState(tabParam === 'draft' ? "draft" : "published");
 
   useEffect(() => {
-    // Load articles from localStorage
     const savedArticles = localStorage.getItem("savedArticles");
     if (savedArticles) {
       setArticles(JSON.parse(savedArticles));
@@ -37,7 +35,6 @@ const SavedArticles = () => {
   }, []);
 
   useEffect(() => {
-    // Update active tab when URL query parameter changes
     if (tabParam === 'draft' || tabParam === 'published') {
       setActiveTab(tabParam);
     }
@@ -48,6 +45,14 @@ const SavedArticles = () => {
     setArticles(updatedArticles);
     localStorage.setItem("savedArticles", JSON.stringify(updatedArticles));
     toast.success("Article deleted successfully");
+  };
+
+  const shareToInstagram = () => {
+    window.open('https://www.instagram.com', '_blank');
+  };
+
+  const shareToLinkedIn = () => {
+    window.open('https://www.linkedin.com', '_blank');
   };
 
   const filteredArticles = articles.filter(article => article.type === activeTab);
@@ -124,6 +129,26 @@ const SavedArticles = () => {
                               View
                             </Link>
                           </Button>
+                          <div className="flex gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={shareToInstagram}
+                              className="transition-all duration-300"
+                            >
+                              <Instagram className="h-4 w-4 mr-1" />
+                              Share on Instagram
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={shareToLinkedIn}
+                              className="transition-all duration-300"
+                            >
+                              <Linkedin className="h-4 w-4 mr-1" />
+                              Share on LinkedIn
+                            </Button>
+                          </div>
                           <Button 
                             variant="destructive" 
                             size="sm" 
