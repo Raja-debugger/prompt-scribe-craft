@@ -52,7 +52,7 @@ const SavedArticles = () => {
   };
 
   const shareToLinkedIn = () => {
-    window.open('https://www.linkedin.com', '_blank');
+    window.open('https://www.linkedin.com/feed/?trk=guest_homepage-basic_google-one-tap-submit', '_blank');
   };
 
   const filteredArticles = articles.filter(article => article.type === activeTab);
