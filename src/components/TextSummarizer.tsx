@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -70,6 +69,8 @@ const TextSummarizer: React.FC<TextSummarizerProps> = ({
   const speakSummary = () => {
     if (summary) {
       const utterance = new SpeechSynthesisUtterance(summary);
+      utterance.rate = 1; // Normal speed
+      utterance.pitch = 1; // Normal pitch
       speechSynthesis.speak(utterance);
       toast.success("Speaking summary...");
     }
@@ -81,74 +82,80 @@ const TextSummarizer: React.FC<TextSummarizerProps> = ({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
       transition={{ duration: 0.4 }}
-      className="w-full max-w-2xl bg-gradient-to-r from-purple-600 to-indigo-600 p-1 rounded-xl shadow-xl"
+      className="w-full max-w-2xl"
     >
-      <Card className="w-full bg-white dark:bg-gray-900 border-none overflow-hidden">
-        <CardHeader className="flex flex-row items-center justify-between pb-2 bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-950/20 dark:to-indigo-950/20">
-          <div>
-            <CardTitle className="text-lg text-primary">Article Summary</CardTitle>
-          </div>
-          <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
-            <X className="h-4 w-4" />
-          </Button>
-        </CardHeader>
-        
-        <CardContent className="pt-4 pb-0">
-          {isGenerating ? (
-            <div className="flex flex-col items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-primary mb-3" />
-              <p className="text-sm text-muted-foreground text-center">Generating summary with Gemini AI...</p>
+      <div className="bg-gradient-to-r from-[rgba(150,93,233,1)] to-[rgba(99,88,238,1)] p-1 rounded-xl">
+        <Card className="w-full bg-white dark:bg-gray-900 border-none overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <div>
+              <CardTitle className="text-lg font-medium">Article Summary</CardTitle>
             </div>
-          ) : (
-            <div className="space-y-3">
-              <p className="text-xs text-muted-foreground mb-2">
-                Summary of "{articleTitle}":
-              </p>
-              <div className="relative">
-                <Textarea 
-                  value={summary} 
-                  readOnly 
-                  className="h-[150px] resize-none text-foreground text-sm font-normal leading-relaxed"
-                />
+            <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
+              <X className="h-4 w-4" />
+            </Button>
+          </CardHeader>
+          
+          <CardContent className="pt-4 pb-0">
+            {isGenerating ? (
+              <div className="flex flex-col items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-primary mb-3" />
+                <p className="text-sm text-muted-foreground text-center">Generating summary...</p>
               </div>
-            </div>
-          )}
-        </CardContent>
-        
-        <CardFooter className="flex justify-end gap-2 pt-3">
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={copyToClipboard} 
-            disabled={isGenerating || !summary}
-            className="text-xs"
-          >
-            <Copy className="mr-1 h-3 w-3" />
-            Copy
-          </Button>
-          <Button 
-            variant="outline"
-            size="sm"
-            onClick={speakSummary} 
-            disabled={isGenerating || !summary}
-            className="text-xs"
-          >
-            <Headphones className="mr-1 h-3 w-3" />
-            Speak
-          </Button>
-          {onVoiceOver && (
+            ) : (
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground mb-2">
+                  Summary of "{articleTitle}":
+                </p>
+                <div className="relative">
+                  <Textarea 
+                    value={summary} 
+                    readOnly 
+                    className="h-[150px] resize-none text-sm font-normal leading-relaxed border rounded-lg shadow-sm focus:ring-2 focus:ring-purple-500"
+                    style={{ 
+                      fontFamily: "'Poppins', sans-serif",
+                      padding: "10px"
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+          </CardContent>
+          
+          <CardFooter className="flex justify-end gap-2 pt-3">
             <Button 
-              onClick={handleVoiceOver} 
+              variant="outline" 
               size="sm"
+              onClick={copyToClipboard} 
               disabled={isGenerating || !summary}
-              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs"
+              className="text-xs hover:bg-purple-50 transition-colors duration-300"
+            >
+              <Copy className="mr-1 h-3 w-3" />
+              Copy
+            </Button>
+            <Button 
+              variant="outline"
+              size="sm"
+              onClick={speakSummary} 
+              disabled={isGenerating || !summary}
+              className="text-xs hover:bg-purple-50 transition-colors duration-300"
             >
               <Headphones className="mr-1 h-3 w-3" />
-              Voice Over
+              Speak
             </Button>
-          )}
-        </CardFooter>
-      </Card>
+            {onVoiceOver && (
+              <Button 
+                onClick={handleVoiceOver} 
+                size="sm"
+                disabled={isGenerating || !summary}
+                className="bg-gradient-to-r from-[rgba(150,93,233,1)] to-[rgba(99,88,238,1)] hover:from-[rgba(99,88,238,1)] hover:to-[rgba(150,93,233,1)] text-white text-xs transition-all duration-300 transform hover:scale-105"
+              >
+                <Headphones className="mr-1 h-3 w-3" />
+                Voice Over
+              </Button>
+            )}
+          </CardFooter>
+        </Card>
+      </div>
     </motion.div>
   );
 };
